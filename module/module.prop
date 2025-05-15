@@ -1,7 +1,7 @@
 id=tcp_optimiser
 name=TCP Optimiser 
-version=2.1
-versionCode=12
+version=4.2
+versionCode=13
 author=xx (based fatalcoder524)
 description=TCP Optimisations
 updateJson=https://raw.githubusercontent.com/Bouteillepleine/TCP_Optimiser_Module/main/update.json
