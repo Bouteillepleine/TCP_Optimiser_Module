@@ -1,0 +1,17 @@
+# Disable CoreSight
+persist.debug.coresight.config=
+
+# QCOM Use oryon as processor target for ART and Bionic
+dalvik.vm.isa.arm64.features=runtime
+dalvik.vm.isa.arm64.variant=oryon
+ro.bionic.cpu_variant=oryon
+
+# Log
+persist.logd.diag.tcpdump=false
+persist.sys.qseelogd=false
+persist.sys.ssr.enable_debug=false
+vendor.bluetooth.startbtlogger=false
+
+# QCOM DDR power saving
+vendor.chre.enabled=true
+# vendor.pasr.enabled=true

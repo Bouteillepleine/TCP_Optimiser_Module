@@ -1,0 +1,78 @@
+## Oneplus Shit trimming
+## From:
+## DoC:
+
+# Debug and Logs
+debug.sf.oplus_display_trace.enable=false
+debug.vendor.perf.smart_touch.trace=false
+persist.sys.oplus.need_log=false
+persist.sys.ostats_pullerd.enable=false
+persist.sys.ostats_tpd.enable=false
+persist.sys.ostatsd.enable=false
+persist.sys.ssr.enable_debug=false
+persist.vendor.corectl.debug.config=false
+persist.vendor.sys.rawdump_copy=false
+persist.vendor.tracing.hsuart.enabled=false
+ro.oplus.minidump.kernel.log.support=false
+ro.oplus.wifi.minidump.enable.state=false
+
+# Scheduler, freq controllers
+persist.sys.janktracker.enable=false
+persist.sys.obrain_obfuscate.enable=false
+persist.sys.ocenter.enable=false
+persist.sys.oiface.enable=false
+persist.sys.oplus.opt.ui_thread=false
+ro.oplus.camera.defercap.support=false
+
+# Thermal
+oplus.dex.tempcontrol=false
+persist.sys.oplus.wifi.sla.game_high_temperature=100
+ro.oplus.audio.thermal_control=false
+
+# Memory management
+persist.sys.osense.dump=true
+ro.oplus.osense.uaf_enable=false
+persist.oplus.ocompiler=0
+persist.oplus.zygote_ocomp=0
+# persist.sys.atomic.enable=0
+persist.sys.lmk.oplus.kill_memleak_process=0
+persist.sys.oplus.lmkd_super_critical_threshold_8g=1
+persist.sys.oplus.lmkd_super_critical_threshold_12g=1
+persist.sys.oplus.lmkd_super_critical_threshold_16g=1
+persist.sys.oplus.lmkd_super_critical_threshold_24g=1
+persist.sys.oplus.lmkd_super_critical_threshold_rus_8g=1
+persist.sys.oplus.lmkd_super_critical_threshold_rus_12g=1
+persist.sys.oplus.lmkd_super_critical_threshold_rus_16g=1
+persist.sys.oplus.lmkd_super_critical_threshold_rus_24g=1
+persist.vendor.enable.preload=false
+sys.lmk.oplus.force_use_old_strategy=0
+sys.oplus.lmk.anon.opt=0
+sys.oplus.lmk.change_limit=0
+sys.oplus.lmk_killed_memleak_pid=0
+sys.oplus.vm.oplus_compact_memory=0
+sys.priority.optimize.enable=0
+ro.lmk.enable_watermark_check=0
+ro.lmk.filecache_min_kb=4
+ro.lmk.nstrat_psi_complete_ms=850
+ro.lmk.nstrat_psi_partial_ms=250
+ro.lmk.nstrat_wmark_boost_factor=15000
+ro.lmk.psi_scrit_complete_stall_ms=999
+ro.lmk.super_critical=0
+ro.lmk.use_new_strategy_dup=1
+ro.lmk.use_minfree_levels_dup=0
+
+# Misc shits
+persist.sys.hardcoder.name=
+persist.sys.oem_smooth=false
+persist.sys.oplus.cvt.manager=false
+persist.sys.oppo.junkmonitor=false
+persist.sys.tasktracker.enable=false
+sys.oplus.cvt.enable=false
+
+# ART Optimizations
+vendor.oplus.dalvik.vm.heapgrowthlimit=512m
+vendor.oplus.dalvik.vm.heapmaxfree=32m
+vendor.oplus.dalvik.vm.heapminfree=512k
+vendor.oplus.dalvik.vm.heapsize=512m
+vendor.oplus.dalvik.vm.heapstartsize=2m
+vendor.oplus.dalvik.vm.heaptargetutilization=0.8
