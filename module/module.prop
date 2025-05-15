@@ -1,7 +1,7 @@
 id=tcp_optimiser
 name=TCP Optimiser 
-version=2.0
-versionCode=11
+version=2.1
+versionCode=12
 author=fatalcoder524
 description=TCP Optimisations & update tcp_cong_algo based on interface
-updateJson=https://raw.githubusercontent.com/fatalcoder524/TCP_Optimiser_Module/main/update.json
+updateJson=https://raw.githubusercontent.com/Bouteillepleine/TCP_Optimiser_Module/main/update.json
