@@ -1,2 +1,107 @@
+# bbr
 net.ipv4.tcp_congestion_control=bbr
 net.core.default_qdisc=fq
+# dex2oat Optimizations
+dalvik.vm.background-dex2oat-cpu-set=0,1,2,3,4,5,6,7
+dalvik.vm.background-dex2oat-threads=8
+dalvik.vm.boot-dex2oat-cpu-set=0,1,2,3,4,5,6,7
+dalvik.vm.boot-dex2oat-threads=8
+dalvik.vm.dex2oat-cpu-set=0,1,2,3,4,5,6,7
+dalvik.vm.dex2oat-swap=true
+dalvik.vm.dex2oat-threads=8
+dalvik.vm.image-dex2oat-cpu-set=0,1,2,3,4,5,6,7
+dalvik.vm.image-dex2oat-threads=8
+dalvik.vm.restore-dex2oat-cpu-set=0,1,2,3,4,5,6,7
+dalvik.vm.restore-dex2oat-threads=8
+dalvik.vm.madvise.artfile.size=2147483647
+dalvik.vm.madvise.odexfile.size=2147483647
+dalvik.vm.madvise.vdexfile.size=2147483647
+dalvik.vm.systemservercompilerfilter=everything
+dalvik.vm.systemuicompilerfilter=everything
+# dex2oat Trigger
+pm.dexopt.ab-ota=verify
+pm.dexopt.bg-dexopt=everything
+pm.dexopt.boot-after-ota=verify
+pm.dexopt.boot-after-mainline-update=verify
+pm.dexopt.cmdline=everything
+pm.dexopt.downgrade_after_inactive_days=30
+pm.dexopt.first-boot=verify
+pm.dexopt.first-use=verify
+pm.dexopt.inactive=verify
+pm.dexopt.install=everything
+pm.dexopt.install-bulk=everything
+pm.dexopt.install-bulk-downgraded=everything
+pm.dexopt.install-bulk-secondary=everything
+pm.dexopt.install-bulk-secondary-downgraded=everything
+pm.dexopt.install-fast=verify
+pm.dexopt.post-boot=verify
+pm.dexopt.shared=everything
+# Misc ART optimizations
+dalvik.vm.backgroundgctype=HSpaceCompact
+dalvik.vm.dex2oat-minidebuginfo=false
+dalvik.vm.foreground-heap-growth-multiplier=2.5
+dalvik.vm.gctype=CMC
+dalvik.vm.heapgrowthlimit=512m
+dalvik.vm.heapmaxfree=32m
+dalvik.vm.heapminfree=512k
+dalvik.vm.heapsize=512m
+dalvik.vm.heapstartsize=2m
+dalvik.vm.heaptargetutilization=0.8
+dalvik.vm.minidebuginfo=false
+dalvik.vm.usap_pool_enabled=true
+dalvik.vm.usap_pool_refill_delay_ms=3000
+dalvik.vm.usap_pool_size_max=3
+dalvik.vm.usap_pool_size_min=1
+dalvik.vm.usap_refill_threshold=1
+persist.device_config.aconfig_flags.runtime_native_boot.disable_lock_profiling=true
+persist.device_config.runtime_native_boot.enable_generational_cc=true
+persist.device_config.runtime_native_boot.disable_lock_profiling=true
+persist.device_config.runtime_native_boot.force_disable_uffd_gc=false
+persist.device_config.runtime_native.usap_pool_enabled=true
+ro.dalvik.vm.enable_uffd_gc=true
+# LMKD
+persist.device_config.aconfig_flags.lmkd_native.use_minfree_levels=false
+persist.device_config.lmkd_native.use_minfree_levels=false
+ro.lmk.psi_complete_stall_ms=900
+ro.lmk.psi_partial_stall_ms=300
+ro.lmk.swap_compression_ratio=5
+ro.lmk.swap_free_low_percentage=0
+ro.lmk.swap_util_max=100
+ro.lmk.use_new_strategy=1
+ro.lmk.use_psi=1
+# AppCompact
+persist.sys.use_boot_compact=false
+# Surfaceflinger performance/power optimizations
+debug.sf.auto_latch_unsignaled=0
+# debug.sf.cache_source_crop_only_moved=true
+# debug.sf.disable_client_composition_cache=0
+# debug.sf.enable_layer_command_batching=true
+# debug.sf.fp16_client_target=true
+# debug.sf.hw=1
+debug.sf.latch_unsignaled=1
+# debug.sf.multithreaded_present=true
+# debug.sf.predict_hwc_composition_strategy=1
+# debug.sf.screenshot_fence_preservation=true
+# ro.surface_flinger.running_without_sync_framework=false
+# ro.surface_flinger.start_graphics_allocator_service=true
+ro.surface_flinger.use_content_detection_for_refresh_rate=false
+# Renderengine optimizations
+# debug.egl.hw=1
+debug.renderengine.backend=skiavkthreaded
+# debug.renderengine.graphite=true
+debug.renderengine.vulkan=true
+debug.stagefright.renderengine.backend=threaded
+persist.sys.force_sw_gles=0
+# HWUI optimizations
+ro.hwui.use_vulkan=1
+# FramePacing
+vendor.perf.framepacing.enable=0
+# Default enable MGLRU
+persist.device_config.mglru_native.lru_gen_config=all
+# Debug
+debug.oplus.labmode_sys_ostats_trigger_trace=0
+debug.oplus.labmode_data_ostats_continuous_trace=0
+debug.ostats.bds.enable=0
+debug.trace_size_limit_enable=true
+sys.olc.service.on=false
+sys.oplus.voldraise2olc=false
