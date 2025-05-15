@@ -19,8 +19,8 @@ fi
 # IPv4 TCP optimizations
 echo 1 > /proc/sys/net/ipv4/tcp_ecn 2>/dev/null
 echo fq > /proc/sys/net/core/default_qdisc 2>/dev/null
-echo 1000 > /proc/sys/net/ipv4/tcp_pacing_ca_ratio 2>/dev/null
-echo 200 > /proc/sys/net/ipv4/tcp_pacing_ss_ratio 2>/dev/null
+echo 110 > /proc/sys/net/ipv4/tcp_pacing_ca_ratio 2>/dev/null
+echo 160 > /proc/sys/net/ipv4/tcp_pacing_ss_ratio 2>/dev/null
 echo 1 > /proc/sys/net/ipv4/tcp_window_scaling 2>/dev/null
 echo "4096 87380 16777216" > /proc/sys/net/ipv4/tcp_rmem 2>/dev/null
 echo "4096 65536 16777216" > /proc/sys/net/ipv4/tcp_wmem 2>/dev/null
