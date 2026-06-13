@@ -4,15 +4,19 @@
   --primary: #bb86fc;
   --text: #e1e1e1;
   --text-secondary: #a0a0a0;
+  --border-color: rgba(255, 255, 255, 0.08);
   --border-radius: 12px;
   --spacing: 16px;
   --footer-height: 60px;
+  --window-inset-top: 0px;
+  --window-inset-bottom: 0px;
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -22,8 +26,8 @@ body {
   min-height: 100vh;
   position: relative;
   padding: var(--spacing);
-  padding-top: var(--window-inset-top);
-  padding-bottom: var(--window-inset-bottom);
+  padding-top: calc(var(--spacing) + var(--window-inset-top));
+  padding-bottom: calc(var(--footer-height) + var(--spacing) + var(--window-inset-bottom));
 }
 
 .container {
@@ -35,6 +39,7 @@ body {
 
 .card {
   background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   padding: var(--spacing);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -55,12 +60,15 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--footer-height);
+  height: calc(var(--footer-height) + var(--window-inset-bottom));
+  padding-bottom: var(--window-inset-bottom);
   background-color: var(--card-bg);
+  border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: space-around;
   align-items: center;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 20;
 }
 
 .nav-item {
@@ -72,7 +80,11 @@ body {
   text-decoration: none;
   color: var(--text-secondary);
   height: 100%;
-  transition: color 0.3s;
+  transition: color 0.3s, transform 0.2s;
+}
+
+.nav-item:active {
+  transform: scale(0.96);
 }
 
 .nav-item.active {
@@ -115,10 +127,14 @@ body {
   font-size: 0.8rem;
 }
 
+.link:active {
+  opacity: 0.75;
+}
+
 .page {
   opacity: 0;
   transform: translateY(20px);
-  transition: all 0.4s ease;
+  transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 .page.active {
