@@ -1,11 +1,20 @@
 .info-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   padding: 8px 0;
 }
 
 .label {
   color: var(--text-secondary);
+  flex: 0 0 auto;
+}
+
+.value {
+  color: var(--text);
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .info-row.hidden {
