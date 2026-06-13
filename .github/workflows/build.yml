@@ -14,90 +14,160 @@ on:
         default: 1
         required: true
 
+permissions:
+  contents: write
+
 jobs:
   build-release:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Read current module.prop
-        id: read_version
+      - name: Read and calculate new version
+        id: version
+        shell: bash
         run: |
+          set -euo pipefail
+
           cd ./module
-          VERSION=$(grep '^version=' module.prop | cut -d'=' -f2)
-          VERSION_CODE=$(grep '^versionCode=' module.prop | cut -d'=' -f2)
-          
+
+          VERSION="$(grep '^version=' module.prop | cut -d'=' -f2)"
+          VERSION_CODE="$(grep '^versionCode=' module.prop | cut -d'=' -f2)"
+
           MAJOR="${{ github.event.inputs.major }}"
           MINOR="${{ github.event.inputs.minor }}"
-          
+
           IFS='.' read -r CURRENT_MAJOR CURRENT_MINOR <<< "$VERSION"
+
+          CURRENT_MAJOR="${CURRENT_MAJOR:-0}"
+          CURRENT_MINOR="${CURRENT_MINOR:-0}"
+
           NEW_MAJOR=$((CURRENT_MAJOR + MAJOR))
+
           if [ "$MAJOR" -gt 0 ]; then
-              NEW_MINOR="$MINOR"
+            NEW_MINOR="$MINOR"
           else
-              NEW_MINOR=$((CURRENT_MINOR + MINOR))
+            NEW_MINOR=$((CURRENT_MINOR + MINOR))
           fi
+
           NEW_VERSION="$NEW_MAJOR.$NEW_MINOR"
           NEW_VERSIONCODE=$((VERSION_CODE + 1))
-          
+          MODULE_ZIP="TCP_Optimiser-${NEW_VERSION}-${NEW_VERSIONCODE}.zip"
+
           echo "new_version=$NEW_VERSION" >> "$GITHUB_ENV"
           echo "new_versioncode=$NEW_VERSIONCODE" >> "$GITHUB_ENV"
+          echo "module_zip=$MODULE_ZIP" >> "$GITHUB_ENV"
+
+          echo "New version: $NEW_VERSION"
+          echo "New versionCode: $NEW_VERSIONCODE"
+          echo "Module ZIP: $MODULE_ZIP"
 
       - name: Update module.prop
+        shell: bash
         run: |
+          set -euo pipefail
+
           cd ./module
+
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+
           sed -i "s/^version=.*/version=${{ env.new_version }}/" module.prop
           sed -i "s/^versionCode=.*/versionCode=${{ env.new_versioncode }}/" module.prop
-          
-          # Update the updateJson URL inside module.prop
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           sed -i "s|^updateJson=.*|updateJson=https://raw.githubusercontent.com/${{ github.repository }}/${BRANCH_NAME}/update.json|g" module.prop
-          
+
           cat module.prop
 
-      - name: Commit updated module.prop
+      - name: Create module zip
+        shell: bash
         run: |
+          set -euo pipefail
+
           cd ./module
+
+          zip -r "../${{ env.module_zip }}" . \
+            -x "*.git*" \
+            -x ".github/*" \
+            -x "*.yml" \
+            -x "README.md"
+
+          cd ..
+          ls -lh "${{ env.module_zip }}"
+
+      - name: Generate update.json
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ env.new_version }}/${{ env.module_zip }}"
+
+          cat > update.json <<EOF
+          {
+            "version": "${{ env.new_version }}",
+            "versionCode": ${{ env.new_versioncode }},
+            "zipUrl": "$DOWNLOAD_URL",
+            "changelog": "https://github.com/${{ github.repository }}/releases/tag/v${{ env.new_version }}"
+          }
+          EOF
+
+          cat update.json
+
+      - name: Commit version and update.json
+        shell: bash
+        run: |
+          set -euo pipefail
+
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add module.prop
-          git commit -m "Bump version to ${{ env.new_version }} (${{ env.new_versioncode }})"
-          git push origin HEAD:${{ github.ref_name }}
-          
-          cd ..
-          git tag v${{ env.new_version }}
-          git push origin v${{ env.new_version }}
 
-      - name: Create module zip
+          git add module/module.prop update.json
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Bump version to ${{ env.new_version }} (${{ env.new_versioncode }})"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+
+      - name: Create and push tag
+        shell: bash
         run: |
-          cd ./module
-          MODULE_NAME="TCP_Optimiser-${{ env.new_version }}-${{ env.new_versioncode }}"
-          zip -r "../$MODULE_NAME.zip" . -x "*.git*" -x ".github/*" -x "*.yml" -x "README.md"
+          set -euo pipefail
+
+          TAG="v${{ env.new_version }}"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists locally."
+          elif git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "Tag $TAG already exists on remote."
+            exit 1
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: module-zip
-          path: "*.zip"
+          path: ${{ env.module_zip }}
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.new_version }}
-          release_name: ${{ env.new_version }}
+          name: ${{ env.new_version }}
           draft: true
-          prerelease: ${{ github.ref == 'refs/heads/main' && 'false' || 'true' }}
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          files: ${{ env.module_zip }}
+          body: |
+            TCP Optimiser ${{ env.new_version }}
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+            Changes:
+            - Version bump to ${{ env.new_version }} (${{ env.new_versioncode }})
+            - See repository commits for details.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./TCP_Optimiser-${{ env.new_version }}-${{ env.new_versioncode }}.zip
-          asset_name: TCP_Optimiser-${{ env.new_version }}-${{ env.new_versioncode }}.zip
-          asset_content_type: application/zip
