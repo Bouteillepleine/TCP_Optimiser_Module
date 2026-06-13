@@ -5,6 +5,12 @@ import { fetchIsConfigFile } from './common.js';
 
 const MODULE_FALLBACK_DIR = '/data/adb/modules/tcp_optimiser';
 
+const QDISC_OPTIONS = [
+	'fq_codel',
+	'fq',
+	'pfifo_fast'
+];
+
 function getModuleDir() {
 	return router_state.moduleInformation?.moduleDir || MODULE_FALLBACK_DIR;
 }
@@ -15,6 +21,10 @@ function shellQuote(value) {
 
 function isValidAlgorithmName(algo) {
 	return /^[A-Za-z0-9_-]+$/.test(String(algo || ''));
+}
+
+function isValidQdiscName(qdisc) {
+	return QDISC_OPTIONS.includes(String(qdisc || ''));
 }
 
 function getDefaultAlgorithm(options) {
@@ -46,6 +56,19 @@ function getSettingsAlgoKey(prefix) {
 	}
 }
 
+function getSettingsQdiscKey(prefix) {
+	switch (prefix) {
+		case 'wlan':
+			return 'wlanQdisc';
+
+		case 'rmnet_data':
+			return 'rmnetQdisc';
+
+		default:
+			return null;
+	}
+}
+
 async function getSelectedAlgorithm(prefix) {
 	const key = getSettingsAlgoKey(prefix);
 
@@ -56,8 +79,14 @@ async function getSelectedAlgorithm(prefix) {
 	try {
 		const moduleDir = getModuleDir();
 
+		/*
+		 * Important:
+		 * Exclude qdisc markers, otherwise wlan_qdisc_fq_codel would be parsed
+		 * as algorithm "qdisc_fq_codel".
+		 */
 		const { stdout } = await exec(
-			`find ${shellQuote(moduleDir)} -maxdepth 1 -type f -name ${shellQuote(`${prefix}_*`)} ` +
+			`find ${shellQuote(moduleDir)} -maxdepth 1 -type f ` +
+			`-name ${shellQuote(`${prefix}_*`)} ! -name ${shellQuote(`${prefix}_qdisc_*`)} ` +
 			`| sed 's|.*/||' | head -n1 | sed 's/^${prefix}_//'`
 		);
 
@@ -70,6 +99,37 @@ async function getSelectedAlgorithm(prefix) {
 		addLog(`Error fetching selected algorithm for ${prefix}.`);
 		toast('Error fetching congestion control algorithm.');
 		return null;
+	}
+}
+
+async function getSelectedQdisc(prefix) {
+	const key = getSettingsQdiscKey(prefix);
+
+	if (!key) {
+		return 'fq_codel';
+	}
+
+	try {
+		const moduleDir = getModuleDir();
+
+		const { stdout } = await exec(
+			`find ${shellQuote(moduleDir)} -maxdepth 1 -type f ` +
+			`-name ${shellQuote(`${prefix}_qdisc_*`)} ` +
+			`| sed 's|.*/||' | head -n1 | sed 's/^${prefix}_qdisc_//'`
+		);
+
+		const qdisc = stdout.trim();
+
+		router_state.settingsPageParams[key] = isValidQdiscName(qdisc)
+			? qdisc
+			: 'fq_codel';
+
+		return router_state.settingsPageParams[key];
+	} catch (error) {
+		console.error('Error fetching selected qdisc:', error);
+		addLog(`Error fetching selected qdisc for ${prefix}.`);
+		toast('Error fetching qdisc profile.');
+		return 'fq_codel';
 	}
 }
 
@@ -87,12 +147,26 @@ async function checkAndGetPrefixValueExists(prefix) {
 	return router_state.settingsPageParams[key];
 }
 
+async function checkAndGetQdiscValueExists(prefix) {
+	const key = getSettingsQdiscKey(prefix);
+
+	if (!key) {
+		return 'fq_codel';
+	}
+
+	if (router_state.settingsPageParams[key] === null) {
+		return await getSelectedQdisc(prefix);
+	}
+
+	return router_state.settingsPageParams[key];
+}
+
 async function populateDropdown(dropdown, options, prefix) {
 	if (!dropdown) {
 		return;
 	}
 
-	dropdown.innerHTML = '';
+	dropdown.textContent = '';
 
 	const safeOptions = Array.isArray(options)
 		? options.filter(isValidAlgorithmName)
@@ -114,6 +188,31 @@ async function populateDropdown(dropdown, options, prefix) {
 	});
 
 	dropdown.value = selectedAlgorithm;
+}
+
+async function populateQdiscDropdown(dropdown, prefix) {
+	if (!dropdown) {
+		return;
+	}
+
+	dropdown.textContent = '';
+
+	let selectedQdisc = await checkAndGetQdiscValueExists(prefix);
+
+	if (!isValidQdiscName(selectedQdisc)) {
+		selectedQdisc = 'fq_codel';
+	}
+
+	QDISC_OPTIONS.forEach(option => {
+		const optionElement = document.createElement('option');
+
+		optionElement.textContent = option;
+		optionElement.value = option;
+
+		dropdown.appendChild(optionElement);
+	});
+
+	dropdown.value = selectedQdisc;
 }
 
 const fetchAvailableAlgorithms = async (force = false) => {
@@ -150,12 +249,40 @@ async function ensureSettingsCache() {
 	if (router_state.settingsPageParams.initcwndInitrwnd === null) {
 		router_state.settingsPageParams.initcwndInitrwnd = await fetchIsConfigFile('initcwnd_initrwnd');
 	}
+
+	if (router_state.settingsPageParams.wlanQdisc === null) {
+		router_state.settingsPageParams.wlanQdisc = await getSelectedQdisc('wlan');
+	}
+
+	if (router_state.settingsPageParams.rmnetQdisc === null) {
+		router_state.settingsPageParams.rmnetQdisc = await getSelectedQdisc('rmnet_data');
+	}
+}
+
+function removeMarkersCommand(moduleDir, prefix, type) {
+	if (type === 'algo') {
+		return (
+			`find ${shellQuote(moduleDir)} -maxdepth 1 -type f ` +
+			`-name ${shellQuote(`${prefix}_*`)} ! -name ${shellQuote(`${prefix}_qdisc_*`)} -delete`
+		);
+	}
+
+	if (type === 'qdisc') {
+		return (
+			`find ${shellQuote(moduleDir)} -maxdepth 1 -type f ` +
+			`-name ${shellQuote(`${prefix}_qdisc_*`)} -delete`
+		);
+	}
+
+	return 'true';
 }
 
 async function applySettings(elements) {
 	const {
 		wifiAlgo,
 		cellularAlgo,
+		wifiQdisc,
+		cellularQdisc,
 		killConnections,
 		initcwndInitrwnd,
 		applyBtn,
@@ -165,6 +292,8 @@ async function applySettings(elements) {
 	const settings = {
 		wlanAlgorithm: wifiAlgo?.value || '',
 		rmnetAlgorithm: cellularAlgo?.value || '',
+		wlanQdisc: wifiQdisc?.value || 'fq_codel',
+		rmnetQdisc: cellularQdisc?.value || 'fq_codel',
 		killOnChange: Boolean(killConnections?.checked),
 		setInitcwndInitrwndOnChange: Boolean(initcwndInitrwnd?.checked)
 	};
@@ -187,6 +316,15 @@ async function applySettings(elements) {
 		return 1;
 	}
 
+	if (
+		!isValidQdiscName(settings.wlanQdisc) ||
+		!isValidQdiscName(settings.rmnetQdisc)
+	) {
+		toast('Invalid qdisc selected.');
+		addLog('Invalid qdisc selected in settings.');
+		return 1;
+	}
+
 	try {
 		const moduleDir = getModuleDir();
 
@@ -200,8 +338,19 @@ async function applySettings(elements) {
 
 		await exec(`mkdir -p ${shellQuote(moduleDir)}`);
 
-		await exec(`rm -f ${shellQuote(`${moduleDir}/wlan_*`)} ${shellQuote(`${moduleDir}/rmnet_data_*`)}`);
-		await exec(`rm -f ${shellQuote(`${moduleDir}/kill_connections`)} ${shellQuote(`${moduleDir}/initcwnd_initrwnd`)}`);
+		/*
+		 * Do not use rm -f wlan_* anymore.
+		 * It would delete both algorithm markers and qdisc markers.
+		 */
+		await exec(removeMarkersCommand(moduleDir, 'wlan', 'algo'));
+		await exec(removeMarkersCommand(moduleDir, 'rmnet_data', 'algo'));
+		await exec(removeMarkersCommand(moduleDir, 'wlan', 'qdisc'));
+		await exec(removeMarkersCommand(moduleDir, 'rmnet_data', 'qdisc'));
+
+		await exec(
+			`rm -f ${shellQuote(`${moduleDir}/kill_connections`)} ` +
+			`${shellQuote(`${moduleDir}/initcwnd_initrwnd`)}`
+		);
 
 		await exec(
 			`touch ${shellQuote(`${moduleDir}/wlan_${settings.wlanAlgorithm}`)} && ` +
@@ -211,6 +360,16 @@ async function applySettings(elements) {
 		await exec(
 			`touch ${shellQuote(`${moduleDir}/rmnet_data_${settings.rmnetAlgorithm}`)} && ` +
 			`chmod 644 ${shellQuote(`${moduleDir}/rmnet_data_${settings.rmnetAlgorithm}`)}`
+		);
+
+		await exec(
+			`touch ${shellQuote(`${moduleDir}/wlan_qdisc_${settings.wlanQdisc}`)} && ` +
+			`chmod 644 ${shellQuote(`${moduleDir}/wlan_qdisc_${settings.wlanQdisc}`)}`
+		);
+
+		await exec(
+			`touch ${shellQuote(`${moduleDir}/rmnet_data_qdisc_${settings.rmnetQdisc}`)} && ` +
+			`chmod 644 ${shellQuote(`${moduleDir}/rmnet_data_qdisc_${settings.rmnetQdisc}`)}`
 		);
 
 		if (settings.killOnChange) {
@@ -229,6 +388,8 @@ async function applySettings(elements) {
 
 		router_state.settingsPageParams.wlanAlgo = settings.wlanAlgorithm;
 		router_state.settingsPageParams.rmnetAlgo = settings.rmnetAlgorithm;
+		router_state.settingsPageParams.wlanQdisc = settings.wlanQdisc;
+		router_state.settingsPageParams.rmnetQdisc = settings.rmnetQdisc;
 		router_state.settingsPageParams.killConnections = settings.killOnChange;
 		router_state.settingsPageParams.initcwndInitrwnd = settings.setInitcwndInitrwndOnChange;
 
@@ -237,6 +398,8 @@ async function applySettings(elements) {
 		addLog(
 			`Applying settings: WiFi=${settings.wlanAlgorithm}, ` +
 			`Cellular=${settings.rmnetAlgorithm}, ` +
+			`WiFiQdisc=${settings.wlanQdisc}, ` +
+			`CellularQdisc=${settings.rmnetQdisc}, ` +
 			`Kill=${settings.killOnChange}, ` +
 			`initcwnd_initrwnd=${settings.setInitcwndInitrwndOnChange}`
 		);
@@ -257,6 +420,16 @@ async function applySettings(elements) {
 			forceApplyBtn.disabled = false;
 		}
 	}
+}
+
+function refreshOpenCollapsibles() {
+	document.querySelectorAll('.collapsible-header.active').forEach(header => {
+		const content = header.nextElementSibling;
+
+		if (content && !content.classList.contains('collapsed')) {
+			content.style.maxHeight = `${content.scrollHeight}px`;
+		}
+	});
 }
 
 function bindCollapsibles() {
@@ -305,6 +478,8 @@ export async function initSettings() {
 	const elements = {
 		wifiAlgo: document.getElementById('wifi-algo'),
 		cellularAlgo: document.getElementById('cellular-algo'),
+		wifiQdisc: document.getElementById('wifi-qdisc'),
+		cellularQdisc: document.getElementById('cellular-qdisc'),
 		killConnections: document.getElementById('kill-connections'),
 		initcwndInitrwnd: document.getElementById('initcwnd-initrwnd'),
 		applyBtn: document.getElementById('apply'),
@@ -318,6 +493,9 @@ export async function initSettings() {
 		await populateDropdown(elements.wifiAlgo, router_state.available_algorithms, 'wlan');
 		await populateDropdown(elements.cellularAlgo, router_state.available_algorithms, 'rmnet_data');
 
+		await populateQdiscDropdown(elements.wifiQdisc, 'wlan');
+		await populateQdiscDropdown(elements.cellularQdisc, 'rmnet_data');
+
 		if (elements.killConnections) {
 			elements.killConnections.checked = Boolean(router_state.settingsPageParams.killConnections);
 		}
@@ -325,6 +503,8 @@ export async function initSettings() {
 		if (elements.initcwndInitrwnd) {
 			elements.initcwndInitrwnd.checked = Boolean(router_state.settingsPageParams.initcwndInitrwnd);
 		}
+
+		refreshOpenCollapsibles();
 
 		if (elements.applyBtn && elements.applyBtn.dataset.bound !== 'true') {
 			elements.applyBtn.dataset.bound = 'true';
@@ -365,6 +545,7 @@ export async function initSettings() {
 		}
 
 		bindCollapsibles();
+		refreshOpenCollapsibles();
 	} catch (error) {
 		console.error('Error initializing settings:', error);
 		addLog('Error initializing settings page.');
