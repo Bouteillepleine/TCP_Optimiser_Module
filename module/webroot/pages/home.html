@@ -1,31 +1,48 @@
-<div class="card system-info">
+<div class="card system-info" aria-labelledby="status-title">
 	<div class="card-header">
-	<h3>Status</h3>
+		<h3 id="status-title">Status</h3>
 	</div>
+
 	<div class="info-row">
 		<span class="label">Module Status</span>
 		<span id="module_status_value" class="value">Loading Module Status...</span>
 	</div>
+
 	<div id="active_iface_type_div" class="info-row hidden">
 		<span class="label">Interface Type</span>
 		<span id="active_iface_type_value" class="value">Loading Active interface type...</span>
 	</div>
+
 	<div id="active_iface_div" class="info-row hidden">
 		<span class="label">Interface Name</span>
 		<span id="active_iface_value" class="value">Loading Active interface...</span>
 	</div>
+
 	<div id="tcp_cong_div" class="info-row hidden">
 		<span class="label">TCP Congestion Algorithm</span>
 		<span id="tcp_cong_value" class="value">Loading Active Algorithm...</span>
 	</div>
+
+	<div id="available_algorithms_div" class="info-row hidden">
+		<span class="label">Available TCP Algorithms</span>
+		<span id="available_algorithms_value" class="value">Loading Available Algorithms...</span>
+	</div>
+
+	<div id="default_qdisc_div" class="info-row hidden">
+		<span class="label">Default Qdisc</span>
+		<span id="default_qdisc_value" class="value">Loading Default Qdisc...</span>
+	</div>
+
 	<div id="initcwnd_value_div" class="info-row hidden">
 		<span class="label">initcwnd value</span>
 		<span id="initcwnd_value" class="value">Loading initcwnd value...</span>
 	</div>
+
 	<div id="initrwnd_value_div" class="info-row hidden">
 		<span class="label">initrwnd value</span>
 		<span id="initrwnd_value" class="value">Loading initrwnd value...</span>
 	</div>
+
 	<div id="wifi_calling_value_div" class="info-row hidden">
 		<span class="label">Wi-Fi Calling</span>
 		<span id="wifi_calling_value" class="value">Loading Wi-Fi Calling Status...</span>
