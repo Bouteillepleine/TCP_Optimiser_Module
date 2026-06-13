@@ -95,6 +95,18 @@ function setErrorPage(message = '⚠️⚠️⚠️ Error loading page. ⚠️�
 	currentPage.appendChild(wrapper);
 }
 
+async function detectSelectedQdisc(prefix) {
+	const qdiscOptions = ['fq_codel', 'fq', 'pfifo_fast'];
+
+	for (const qdisc of qdiscOptions) {
+		if (await fetchIsConfigFile(`${prefix}_qdisc_${qdisc}`)) {
+			return qdisc;
+		}
+	}
+
+	return 'fq_codel';
+}
+
 async function updateSettingsCache() {
 	try {
 		if (router_state.settingsPageParams.killConnections === null) {
@@ -106,15 +118,11 @@ async function updateSettingsCache() {
 		}
 
 		if (router_state.settingsPageParams.wlanQdisc === null) {
-			router_state.settingsPageParams.wlanQdisc = await fetchIsConfigFile('wlan_qdisc_fq_codel')
-				? 'fq_codel'
-				: null;
+			router_state.settingsPageParams.wlanQdisc = await detectSelectedQdisc('wlan');
 		}
 
 		if (router_state.settingsPageParams.rmnetQdisc === null) {
-			router_state.settingsPageParams.rmnetQdisc = await fetchIsConfigFile('rmnet_data_qdisc_fq_codel')
-				? 'fq_codel'
-				: null;
+			router_state.settingsPageParams.rmnetQdisc = await detectSelectedQdisc('rmnet_data');
 		}
 	} catch (error) {
 		console.error('Error updating settings cache:', error);
@@ -291,8 +299,31 @@ function bindNavigation() {
 	});
 }
 
+function bindExternalLinks() {
+	document.querySelectorAll('.external-link[data-value]').forEach(link => {
+		if (link.dataset.bound === 'true') {
+			return;
+		}
+
+		link.dataset.bound = 'true';
+
+		link.addEventListener('click', (event) => {
+			event.preventDefault();
+
+			const url = event.currentTarget.dataset.value;
+
+			if (!url || !/^https?:\/\//.test(url)) {
+				return;
+			}
+
+			window.open(url, '_blank', 'noopener,noreferrer');
+		});
+	});
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
 	try {
+		bindExternalLinks();
 		bindNavigation();
 
 		await loadPage('home');
