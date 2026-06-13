@@ -12,21 +12,26 @@
 .setting-row label {
   color: var(--text-secondary);
   flex: 1;
+  min-width: 0;
 }
 
-#kill-connections-label, #initcwnd-initrwnd-label {
+#kill-connections-label,
+#initcwnd-initrwnd-label {
   color: var(--text-secondary);
 }
 
 .dropdown {
   width: 180px;
-  padding: 8px 12px;
+  max-width: 55%;
+  padding: 8px 36px 8px 12px;
   background-color: var(--card-bg);
   border: 1px solid #3d3d3d;
   border-radius: 6px;
   color: var(--text);
   font-size: 0.9rem;
+  line-height: 1.2;
   appearance: none;
+  -webkit-appearance: none;
   cursor: pointer;
 }
 
@@ -44,6 +49,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
 }
 
 .toggle {
@@ -51,6 +57,7 @@
   display: inline-block;
   width: 50px;
   height: 26px;
+  flex-shrink: 0;
 }
 
 .toggle input {
@@ -62,12 +69,9 @@
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background-color: #2d2d2d;
-  transition: .4s;
+  transition: background-color 0.25s, opacity 0.25s;
   border-radius: 34px;
 }
 
@@ -79,7 +83,7 @@
   left: 3px;
   bottom: 3px;
   background-color: var(--text);
-  transition: .4s;
+  transition: transform 0.25s;
   border-radius: 50%;
 }
 
@@ -89,6 +93,11 @@ input:checked + .slider {
 
 input:checked + .slider:before {
   transform: translateX(24px);
+}
+
+input:disabled + .slider {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .apply-btn {
@@ -101,11 +110,21 @@ input:checked + .slider:before {
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, transform 0.2s;
 }
 
 .apply-btn:hover {
   opacity: 0.9;
+}
+
+.apply-btn:active {
+  transform: scale(0.98);
+  opacity: 0.85;
+}
+
+.apply-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .collapsible-group {
@@ -116,6 +135,7 @@ input:checked + .slider:before {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   cursor: pointer;
   padding: 8px 0;
   border-bottom: 1px solid #3d3d3d;
@@ -129,6 +149,7 @@ input:checked + .slider:before {
 
 .collapsible-header .arrow {
   transition: transform 0.3s ease;
+  flex-shrink: 0;
 }
 
 .collapsible-header.active .arrow {
@@ -137,11 +158,29 @@ input:checked + .slider:before {
 
 .collapsible-content {
   overflow: hidden;
-  transition: max-height 0.3s ease-out;
-  max-height: 200px; /* Adjust based on expected content height */
+  transition: max-height 0.3s ease-out, margin 0.3s ease-out;
+  max-height: 240px;
   margin: 12px 0;
 }
 
 .collapsible-content.collapsed {
   max-height: 0;
+  margin: 0;
+}
+
+@media (max-width: 420px) {
+  .setting-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dropdown {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .toggle-container {
+    gap: 12px;
+  }
 }
