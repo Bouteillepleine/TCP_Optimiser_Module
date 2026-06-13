@@ -1,119 +1,222 @@
 let callbackCounter = 0;
+
 function getUniqueCallbackName(prefix) {
-  return `${prefix}_callback_${Date.now()}_${callbackCounter++}`;
+	return `${prefix}_callback_${Date.now()}_${callbackCounter++}`;
 }
 
-export function exec(command, options) {
-  if (typeof options === "undefined") {
-    options = {};
-  }
+function hasKsuApi(method) {
+	return typeof window.ksu !== 'undefined' && typeof window.ksu[method] === 'function';
+}
 
-  return new Promise((resolve, reject) => {
-    // Generate a unique callback function name
-    const callbackFuncName = getUniqueCallbackName("exec");
+function safeJsonStringify(value, fallback = '{}') {
+	try {
+		return JSON.stringify(value);
+	} catch (_) {
+		return fallback;
+	}
+}
 
-    // Define the success callback function
-    window[callbackFuncName] = (errno, stdout, stderr) => {
-      resolve({ errno, stdout, stderr });
-      cleanup(callbackFuncName);
-    };
+export function exec(command, options = {}) {
+	return new Promise((resolve, reject) => {
+		if (!hasKsuApi('exec')) {
+			reject(new Error('KernelSU exec API is not available.'));
+			return;
+		}
 
-    function cleanup(successName) {
-      delete window[successName];
-    }
+		const callbackFuncName = getUniqueCallbackName('exec');
 
-    try {
-      ksu.exec(command, JSON.stringify(options), callbackFuncName);
-    } catch (error) {
-      reject(error);
-      cleanup(callbackFuncName);
-    }
-  });
+		function cleanup() {
+			try {
+				delete window[callbackFuncName];
+			} catch (_) {
+				window[callbackFuncName] = undefined;
+			}
+		}
+
+		window[callbackFuncName] = (errno, stdout = '', stderr = '') => {
+			cleanup();
+
+			const result = {
+				errno,
+				stdout,
+				stderr
+			};
+
+			if (Number(errno) !== 0) {
+				const error = new Error(stderr || `Command failed with errno ${errno}`);
+				error.result = result;
+				reject(error);
+				return;
+			}
+
+			resolve(result);
+		};
+
+		try {
+			window.ksu.exec(
+				String(command),
+				safeJsonStringify(options),
+				callbackFuncName
+			);
+		} catch (error) {
+			cleanup();
+			reject(error);
+		}
+	});
 }
 
 function Stdio() {
-    this.listeners = {};
-  }
-  
-  Stdio.prototype.on = function (event, listener) {
-    if (!this.listeners[event]) {
-      this.listeners[event] = [];
-    }
-    this.listeners[event].push(listener);
-  };
-  
-  Stdio.prototype.emit = function (event, ...args) {
-    if (this.listeners[event]) {
-      this.listeners[event].forEach((listener) => listener(...args));
-    }
-  };
-  
-  function ChildProcess() {
-    this.listeners = {};
-    this.stdin = new Stdio();
-    this.stdout = new Stdio();
-    this.stderr = new Stdio();
-  }
-  
-  ChildProcess.prototype.on = function (event, listener) {
-    if (!this.listeners[event]) {
-      this.listeners[event] = [];
-    }
-    this.listeners[event].push(listener);
-  };
-  
-  ChildProcess.prototype.emit = function (event, ...args) {
-    if (this.listeners[event]) {
-      this.listeners[event].forEach((listener) => listener(...args));
-    }
-  };
-  
-  export function spawn(command, args, options) {
-    if (typeof args === "undefined") {
-      args = [];
-    } else if (!(args instanceof Array)) {
-        // allow for (command, options) signature
-        options = args;
-    }
-    
-    if (typeof options === "undefined") {
-      options = {};
-    }
-  
-    const child = new ChildProcess();
-    const childCallbackName = getUniqueCallbackName("spawn");
-    window[childCallbackName] = child;
-  
-    function cleanup(name) {
-      delete window[name];
-    }
+	this.listeners = {};
+}
 
-    child.on("exit", code => {
-        cleanup(childCallbackName);
-    });
+Stdio.prototype.on = function (event, listener) {
+	if (!this.listeners[event]) {
+		this.listeners[event] = [];
+	}
 
-    try {
-      ksu.spawn(
-        command,
-        JSON.stringify(args),
-        JSON.stringify(options),
-        childCallbackName
-      );
-    } catch (error) {
-      child.emit("error", error);
-      cleanup(childCallbackName);
-    }
-    return child;
-  }
+	this.listeners[event].push(listener);
+
+	return this;
+};
+
+Stdio.prototype.off = function (event, listener) {
+	if (!this.listeners[event]) {
+		return this;
+	}
+
+	this.listeners[event] = this.listeners[event].filter(item => item !== listener);
+
+	return this;
+};
+
+Stdio.prototype.emit = function (event, ...args) {
+	if (this.listeners[event]) {
+		this.listeners[event].forEach((listener) => {
+			try {
+				listener(...args);
+			} catch (error) {
+				console.error(`Stdio listener error for "${event}":`, error);
+			}
+		});
+	}
+};
+
+function ChildProcess() {
+	this.listeners = {};
+	this.stdin = new Stdio();
+	this.stdout = new Stdio();
+	this.stderr = new Stdio();
+}
+
+ChildProcess.prototype.on = function (event, listener) {
+	if (!this.listeners[event]) {
+		this.listeners[event] = [];
+	}
+
+	this.listeners[event].push(listener);
+
+	return this;
+};
+
+ChildProcess.prototype.off = function (event, listener) {
+	if (!this.listeners[event]) {
+		return this;
+	}
+
+	this.listeners[event] = this.listeners[event].filter(item => item !== listener);
+
+	return this;
+};
+
+ChildProcess.prototype.emit = function (event, ...args) {
+	if (this.listeners[event]) {
+		this.listeners[event].forEach((listener) => {
+			try {
+				listener(...args);
+			} catch (error) {
+				console.error(`ChildProcess listener error for "${event}":`, error);
+			}
+		});
+	}
+};
+
+export function spawn(command, args = [], options = {}) {
+	if (!Array.isArray(args)) {
+		options = args || {};
+		args = [];
+	}
+
+	const child = new ChildProcess();
+
+	if (!hasKsuApi('spawn')) {
+		setTimeout(() => {
+			child.emit('error', new Error('KernelSU spawn API is not available.'));
+			child.emit('exit', 1);
+		}, 0);
+
+		return child;
+	}
+
+	const childCallbackName = getUniqueCallbackName('spawn');
+
+	function cleanup() {
+		try {
+			delete window[childCallbackName];
+		} catch (_) {
+			window[childCallbackName] = undefined;
+		}
+	}
+
+	window[childCallbackName] = child;
+
+	child.on('exit', () => {
+		cleanup();
+	});
+
+	try {
+		window.ksu.spawn(
+			String(command),
+			safeJsonStringify(args, '[]'),
+			safeJsonStringify(options),
+			childCallbackName
+		);
+	} catch (error) {
+		child.emit('error', error);
+		child.emit('exit', 1);
+		cleanup();
+	}
+
+	return child;
+}
 
 export function fullScreen(isFullScreen) {
-  ksu.fullScreen(isFullScreen);
+	if (!hasKsuApi('fullScreen')) {
+		console.warn('KernelSU fullScreen API is not available.');
+		return;
+	}
+
+	window.ksu.fullScreen(Boolean(isFullScreen));
 }
 
 export function toast(message) {
-  ksu.toast(message);
+	if (!hasKsuApi('toast')) {
+		console.warn('KernelSU toast API is not available:', message);
+		return;
+	}
+
+	window.ksu.toast(String(message));
 }
 
 export function moduleInfo() {
-  return ksu.moduleInfo();
+	if (!hasKsuApi('moduleInfo')) {
+		console.warn('KernelSU moduleInfo API is not available.');
+		return '{}';
+	}
+
+	try {
+		return window.ksu.moduleInfo();
+	} catch (error) {
+		console.error('KernelSU moduleInfo error:', error);
+		return '{}';
+	}
 }
