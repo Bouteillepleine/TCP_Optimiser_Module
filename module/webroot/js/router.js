@@ -8,11 +8,13 @@ const router_state = {
 
 	homePageParams: {
 		module_status: 'Loading Module Status...⌛',
-		active_iface_type: 'None',
-		active_iface: 'Unknown ⁉️',
+		active_iface_type: 'Unknown ⁉️',
+		active_iface: 'None',
 		active_algorithm: 'Unknown ⁉️',
 		available_algorithms: [],
 		default_qdisc: 'Unknown ⁉️',
+		active_qdisc: 'Unknown ⁉️',
+		selected_qdisc: 'Unknown ⁉️',
 		active_InitcwndInitrwndValue: [],
 		wifi_calling_state: 'Unknown ⁉️'
 	},
@@ -20,6 +22,8 @@ const router_state = {
 	settingsPageParams: {
 		wlanAlgo: null,
 		rmnetAlgo: null,
+		wlanQdisc: null,
+		rmnetQdisc: null,
 		killConnections: null,
 		initcwndInitrwnd: null
 	},
@@ -32,6 +36,7 @@ const router_state = {
 let currentPageStyle = null;
 let realtimeIntervalId = null;
 let isLoadingPage = false;
+let isRefreshingRuntimeState = false;
 let lastRequestedPage = null;
 
 function getElement(id) {
@@ -72,11 +77,22 @@ function setErrorPage(message = '⚠️⚠️⚠️ Error loading page. ⚠️�
 		return;
 	}
 
-	currentPage.innerHTML = `
-		<div style="display: flex; justify-content: center; align-items: center; height: 100%; flex-direction: column; text-align: center; padding: 16px;">
-			<p>${message}</p>
-		</div>
-	`;
+	currentPage.textContent = '';
+
+	const wrapper = document.createElement('div');
+	wrapper.style.display = 'flex';
+	wrapper.style.justifyContent = 'center';
+	wrapper.style.alignItems = 'center';
+	wrapper.style.height = '100%';
+	wrapper.style.flexDirection = 'column';
+	wrapper.style.textAlign = 'center';
+	wrapper.style.padding = '16px';
+
+	const paragraph = document.createElement('p');
+	paragraph.textContent = message;
+
+	wrapper.appendChild(paragraph);
+	currentPage.appendChild(wrapper);
 }
 
 async function updateSettingsCache() {
@@ -87,6 +103,18 @@ async function updateSettingsCache() {
 
 		if (router_state.settingsPageParams.initcwndInitrwnd === null) {
 			router_state.settingsPageParams.initcwndInitrwnd = await fetchIsConfigFile('initcwnd_initrwnd');
+		}
+
+		if (router_state.settingsPageParams.wlanQdisc === null) {
+			router_state.settingsPageParams.wlanQdisc = await fetchIsConfigFile('wlan_qdisc_fq_codel')
+				? 'fq_codel'
+				: null;
+		}
+
+		if (router_state.settingsPageParams.rmnetQdisc === null) {
+			router_state.settingsPageParams.rmnetQdisc = await fetchIsConfigFile('rmnet_data_qdisc_fq_codel')
+				? 'fq_codel'
+				: null;
 		}
 	} catch (error) {
 		console.error('Error updating settings cache:', error);
@@ -114,6 +142,12 @@ function updateCurrentPageUI() {
 }
 
 async function refreshRuntimeState() {
+	if (isRefreshingRuntimeState) {
+		return;
+	}
+
+	isRefreshingRuntimeState = true;
+
 	try {
 		await updateModuleStatus();
 		await read_log_file();
@@ -123,6 +157,8 @@ async function refreshRuntimeState() {
 	} catch (error) {
 		console.error('Error refreshing runtime state:', error);
 		addLog('Error refreshing runtime state.');
+	} finally {
+		isRefreshingRuntimeState = false;
 	}
 }
 
