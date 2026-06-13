@@ -1,186 +1,298 @@
 .setting-group {
-  margin-bottom: 16px;
+	margin-bottom: 16px;
+}
+
+.setting-group:last-child {
+	margin-bottom: 0;
 }
 
 .setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
 }
 
 .setting-row label {
-  color: var(--text-secondary);
-  flex: 1;
-  min-width: 0;
+	color: var(--text-secondary);
+	flex: 1;
+	min-width: 0;
+	line-height: 1.35;
 }
 
 #kill-connections-label,
 #initcwnd-initrwnd-label {
-  color: var(--text-secondary);
+	color: var(--text-secondary);
+	line-height: 1.35;
+}
+
+/* Dropdown wrapper is optional but recommended if used in HTML */
+.dropdown-wrap,
+.select-wrap {
+	position: relative;
+	width: 180px;
+	max-width: 55%;
+	flex: 0 0 auto;
+}
+
+.dropdown-wrap::after,
+.select-wrap::after {
+	content: "⌄";
+	position: absolute;
+	right: 12px;
+	top: 50%;
+	transform: translateY(-54%);
+	pointer-events: none;
+	color: var(--text-secondary);
+	font-size: 1rem;
+	line-height: 1;
 }
 
 .dropdown {
-  width: 180px;
-  max-width: 55%;
-  padding: 8px 36px 8px 12px;
-  background-color: var(--card-bg);
-  border: 1px solid #3d3d3d;
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 0.9rem;
-  line-height: 1.2;
-  appearance: none;
-  -webkit-appearance: none;
-  cursor: pointer;
+	width: 180px;
+	max-width: 55%;
+
+	padding: 9px 36px 9px 12px;
+
+	background-color: var(--input-bg, rgba(255, 255, 255, 0.04));
+	border: 1px solid var(--border-color, #3d3d3d);
+	border-radius: 8px;
+
+	color: var(--text);
+	font-size: 0.9rem;
+	line-height: 1.2;
+
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+
+	cursor: pointer;
+	outline: none;
+
+	transition:
+		border-color 0.2s ease,
+		background-color 0.2s ease,
+		opacity 0.2s ease;
+}
+
+.dropdown-wrap .dropdown,
+.select-wrap .dropdown {
+	width: 100%;
+	max-width: 100%;
 }
 
 .dropdown:focus {
-  outline: none;
-  border-color: var(--primary);
+	border-color: var(--primary);
+	background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dropdown:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
 }
 
 .dropdown option {
-  background-color: var(--card-bg);
-  color: var(--text);
+	background-color: var(--card-bg);
+	color: var(--text);
 }
 
 .toggle-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
 }
 
 .toggle {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 26px;
-  flex-shrink: 0;
+	position: relative;
+	display: inline-block;
+	width: 50px;
+	height: 26px;
+	flex-shrink: 0;
 }
 
 .toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+	opacity: 0;
+	width: 0;
+	height: 0;
+	position: absolute;
 }
 
 .slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background-color: #2d2d2d;
-  transition: background-color 0.25s, opacity 0.25s;
-  border-radius: 34px;
+	position: absolute;
+	cursor: pointer;
+	inset: 0;
+
+	background-color: var(--toggle-off, #2d2d2d);
+	border-radius: 34px;
+
+	transition:
+		background-color 0.25s ease,
+		opacity 0.25s ease;
 }
 
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 20px;
-  width: 20px;
-  left: 3px;
-  bottom: 3px;
-  background-color: var(--text);
-  transition: transform 0.25s;
-  border-radius: 50%;
+.slider::before {
+	position: absolute;
+	content: "";
+
+	height: 20px;
+	width: 20px;
+	left: 3px;
+	bottom: 3px;
+
+	background-color: var(--text);
+	border-radius: 50%;
+
+	transition: transform 0.25s ease;
 }
 
 input:checked + .slider {
-  background-color: var(--primary);
+	background-color: var(--primary);
 }
 
-input:checked + .slider:before {
-  transform: translateX(24px);
+input:checked + .slider::before {
+	transform: translateX(24px);
 }
 
 input:disabled + .slider {
-  cursor: not-allowed;
-  opacity: 0.45;
+	cursor: not-allowed;
+	opacity: 0.45;
 }
 
 .apply-btn {
-  width: 100%;
-  padding: 12px;
-  background-color: var(--primary);
-  color: #000;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.2s;
+	width: 100%;
+	min-height: 44px;
+
+	padding: 12px;
+
+	background-color: var(--primary);
+	color: var(--button-text, #000);
+
+	border: none;
+	border-radius: 8px;
+
+	font-size: 1rem;
+	font-weight: 700;
+
+	cursor: pointer;
+
+	appearance: none;
+	-webkit-appearance: none;
+
+	transition:
+		opacity 0.2s ease,
+		transform 0.2s ease,
+		background-color 0.2s ease;
 }
 
 .apply-btn:hover {
-  opacity: 0.9;
+	opacity: 0.9;
 }
 
 .apply-btn:active {
-  transform: scale(0.98);
-  opacity: 0.85;
+	transform: scale(0.98);
+	opacity: 0.85;
 }
 
 .apply-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
+	cursor: not-allowed;
+	opacity: 0.55;
 }
 
 .collapsible-group {
-  margin-bottom: 16px;
+	margin-bottom: 16px;
 }
 
+.collapsible-group:last-child {
+	margin-bottom: 0;
+}
+
+/*
+ * Important:
+ * This supports <button class="collapsible-header">...</button>
+ * and prevents Android WebView from applying native white button styling.
+ */
 .collapsible-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  padding: 8px 0;
-  border-bottom: 1px solid #3d3d3d;
+	width: 100%;
+
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+
+	cursor: pointer;
+
+	padding: 10px 0;
+
+	background: transparent;
+	color: var(--text);
+
+	border: 0;
+	border-bottom: 1px solid var(--border-color, #3d3d3d);
+	border-radius: 0;
+
+	text-align: left;
+	font: inherit;
+
+	appearance: none;
+	-webkit-appearance: none;
+
+	box-shadow: none;
+	outline: none;
+}
+
+.collapsible-header:focus-visible {
+	border-bottom-color: var(--primary);
 }
 
 .collapsible-header h4 {
-  margin: 0;
-  font-size: 1rem;
-  color: var(--text);
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--text);
 }
 
 .collapsible-header .arrow {
-  transition: transform 0.3s ease;
-  flex-shrink: 0;
+	transition: transform 0.3s ease;
+	flex-shrink: 0;
+	color: var(--text-secondary);
 }
 
 .collapsible-header.active .arrow {
-  transform: rotate(180deg);
+	transform: rotate(180deg);
 }
 
 .collapsible-content {
-  overflow: hidden;
-  transition: max-height 0.3s ease-out, margin 0.3s ease-out;
-  max-height: 240px;
-  margin: 12px 0;
+	overflow: hidden;
+
+	transition:
+		max-height 0.3s ease-out,
+		margin 0.3s ease-out;
+
+	max-height: 280px;
+	margin: 12px 0;
 }
 
 .collapsible-content.collapsed {
-  max-height: 0;
-  margin: 0;
+	max-height: 0;
+	margin: 0;
 }
 
 @media (max-width: 420px) {
-  .setting-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-  }
+	.setting-row {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 8px;
+	}
 
-  .dropdown {
-    width: 100%;
-    max-width: 100%;
-  }
+	.dropdown,
+	.dropdown-wrap,
+	.select-wrap {
+		width: 100%;
+		max-width: 100%;
+	}
 
-  .toggle-container {
-    gap: 12px;
-  }
+	.toggle-container {
+		gap: 12px;
+	}
 }
