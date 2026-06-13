@@ -1,9 +1,12 @@
 /* Icon styles */
 .nav-icon {
+  display: block;
   width: 24px;
   height: 24px;
   margin-bottom: 4px;
   fill: currentColor;
+  stroke: currentColor;
+  flex-shrink: 0;
 }
 
 .icon {
@@ -13,4 +16,6 @@
   stroke-width: 0;
   stroke: currentColor;
   fill: currentColor;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
 }
