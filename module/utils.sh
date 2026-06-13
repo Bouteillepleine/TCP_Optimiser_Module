@@ -13,31 +13,41 @@ if [ ! -f "$FLAGFILE" ]; then
 fi
 
 log_print() {
-	message="$1"
+    local message="$1"
+    local timestamp
+    local line_count
 
-	timestamp=$(date +'%Y-%m-%d %H:%M:%S')
-	echo "$timestamp - $message" >> "$LOGFILE"
+    timestamp="$(date +'%Y-%m-%d %H:%M:%S')"
+    echo "$timestamp - $message" >> "$LOGFILE"
 
-	line_count=$(wc -l < "$LOGFILE" 2>/dev/null)
-	if [ "$line_count" -gt "$MAX_LOG_LINES" ]; then
-		tail -n "$((MAX_LOG_LINES / 2))" "$LOGFILE" > "${LOGFILE}.tmp"
-		mv "${LOGFILE}.tmp" "$LOGFILE"
-	fi
+    line_count="$(wc -l < "$LOGFILE" 2>/dev/null)"
+    line_count="${line_count:-0}"
+
+    if [ "$line_count" -gt "$MAX_LOG_LINES" ]; then
+        tail -n "$((MAX_LOG_LINES / 2))" "$LOGFILE" > "${LOGFILE}.tmp"
+        mv "${LOGFILE}.tmp" "$LOGFILE"
+    fi
 }
 
 run_as_su() {
-	local cmd="$*"
-	su -c "$cmd"
-	local status=$?
-	return $status
+    local cmd="$*"
+
+    su -c "$cmd" >/dev/null 2>&1
+    return $?
 }
 
 get_wifi_calling_state() {
-	rm -f "$DUMPSYS_TMP_FILE"
-	dumpsys activity service SystemUIService > "$DUMPSYS_TMP_FILE" 2>/dev/null
-	grep -qEm 1 "slot='vowifi'.*visible user=.*" "$DUMPSYS_TMP_FILE"
-	local status=$?
-	rm -f "$DUMPSYS_TMP_FILE"
-	# echo's result: 0 = true (VoWiFi active), 1 = false
-	echo $status
+    rm -f "$DUMPSYS_TMP_FILE" >/dev/null 2>&1
+
+    dumpsys activity service SystemUIService > "$DUMPSYS_TMP_FILE" 2>/dev/null
+
+    grep -qEm 1 "slot='vowifi'.*visible user=.*" "$DUMPSYS_TMP_FILE"
+    local status=$?
+
+    rm -f "$DUMPSYS_TMP_FILE" >/dev/null 2>&1
+
+    # Echo result:
+    # 0 = VoWiFi active
+    # 1 = VoWiFi inactive / not detected
+    echo "$status"
 }
