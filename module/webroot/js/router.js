@@ -1,172 +1,272 @@
 import { updateModuleInformation, fetchIsConfigFile } from './common.js';
-import { updateModuleStatus, initHome, updateHomeUI } from './home.js';
-import { initLogs } from './logs.js';
-import { initSettings } from './settings.js';
+import { updateModuleStatus, updateHomeUI } from './home.js';
 import { addLog, read_log_file, updateLogsUI } from './logs.js';
 
 const router_state = {
 	moduleInformation: null,
 	isInitializing: true,
+
 	homePageParams: {
-		module_status: "Loading Module Status...⌛",
-		active_iface_type: "None",
-		active_iface: "Unknown ⁉️",
-		active_algorithm: "Unknown",
+		module_status: 'Loading Module Status...⌛',
+		active_iface_type: 'None',
+		active_iface: 'Unknown ⁉️',
+		active_algorithm: 'Unknown ⁉️',
+		available_algorithms: [],
+		default_qdisc: 'Unknown ⁉️',
 		active_InitcwndInitrwndValue: [],
-		wifi_calling_state: false,
+		wifi_calling_state: 'Unknown ⁉️'
 	},
+
 	settingsPageParams: {
 		wlanAlgo: null,
 		rmnetAlgo: null,
 		killConnections: null,
-		initcwndInitrwnd: null,
+		initcwndInitrwnd: null
 	},
+
 	logsList: [],
 	available_algorithms: [],
-	current_active_page: null,
+	current_active_page: null
 };
 
-let currentPageStyle = null; // Store reference to the current style link
+let currentPageStyle = null;
+let realtimeIntervalId = null;
+let isLoadingPage = false;
+let lastRequestedPage = null;
 
-function setCSS(pageName) {
-	if (currentPageStyle) {
-		document.head.removeChild(currentPageStyle);
-	}
-
-	currentPageStyle = document.createElement('link');
-	currentPageStyle.rel = 'stylesheet';
-	currentPageStyle.href = `./css/${pageName}.css`;
-	document.head.appendChild(currentPageStyle);
+function getElement(id) {
+	return document.getElementById(id);
 }
 
-const realtimeUpdater = async () => {
+function setCSS(pageName) {
+	const nextStyle = document.createElement('link');
+
+	nextStyle.rel = 'stylesheet';
+	nextStyle.href = `./css/${pageName}.css`;
+	nextStyle.dataset.pageStyle = pageName;
+
+	nextStyle.onload = () => {
+		if (currentPageStyle && currentPageStyle !== nextStyle) {
+			currentPageStyle.remove();
+		}
+
+		currentPageStyle = nextStyle;
+	};
+
+	nextStyle.onerror = () => {
+		console.warn(`Failed to load CSS for page: ${pageName}`);
+
+		if (currentPageStyle && currentPageStyle !== nextStyle) {
+			currentPageStyle.remove();
+			currentPageStyle = null;
+		}
+	};
+
+	document.head.appendChild(nextStyle);
+}
+
+function setErrorPage(message = '⚠️⚠️⚠️ Error loading page. ⚠️⚠️⚠️') {
+	const currentPage = getElement('current-page');
+
+	if (!currentPage) {
+		return;
+	}
+
+	currentPage.innerHTML = `
+		<div style="display: flex; justify-content: center; align-items: center; height: 100%; flex-direction: column; text-align: center; padding: 16px;">
+			<p>${message}</p>
+		</div>
+	`;
+}
+
+async function updateSettingsCache() {
 	try {
-		// First Read
+		if (router_state.settingsPageParams.killConnections === null) {
+			router_state.settingsPageParams.killConnections = await fetchIsConfigFile('kill_connections');
+		}
+
+		if (router_state.settingsPageParams.initcwndInitrwnd === null) {
+			router_state.settingsPageParams.initcwndInitrwnd = await fetchIsConfigFile('initcwnd_initrwnd');
+		}
+	} catch (error) {
+		console.error('Error updating settings cache:', error);
+		addLog('Error updating settings cache.');
+	}
+}
+
+function updateCurrentPageUI() {
+	if (!router_state.current_active_page) {
+		return;
+	}
+
+	switch (router_state.current_active_page) {
+		case 'home':
+			updateHomeUI();
+			break;
+
+		case 'logs':
+			updateLogsUI();
+			break;
+
+		default:
+			break;
+	}
+}
+
+async function refreshRuntimeState() {
+	try {
 		await updateModuleStatus();
 		await read_log_file();
-		
-		// Fetch Settings Value
-		if(router_state.settingsPageParams.killConnections == null)
-			router_state.settingsPageParams.killConnections = await fetchIsConfigFile("kill_connections");
-		
-		if(router_state.settingsPageParams.initcwndInitrwnd == null)
-			router_state.settingsPageParams.initcwndInitrwnd = await fetchIsConfigFile("initcwnd_initrwnd");
+		await updateSettingsCache();
 
-		if(currentPageStyle != null)
-		{
-			switch(router_state.current_active_page)
-			{
-				case 'home':
-					updateHomeUI();
-					break;
-					
-				case 'logs':
-					updateLogsUI();
-					break;
-			}
-		}
-		
-		setInterval(async () => {
-			await updateModuleStatus();
-			await read_log_file();
-			if(currentPageStyle != null)
-			{
-				switch(router_state.current_active_page)
-				{
-					case 'home':
-						updateHomeUI();
-						break;
-					
-					case 'logs':
-					updateLogsUI();
-					break;
-				}
-			}
-		}, "5000");
+		updateCurrentPageUI();
 	} catch (error) {
-		console.error('Error setting update loop: ', error);
-		addLog('Error setting update loop.');
+		console.error('Error refreshing runtime state:', error);
+		addLog('Error refreshing runtime state.');
 	}
-};
+}
 
-document.addEventListener('DOMContentLoaded', async () => {
+function startRealtimeUpdater() {
+	if (realtimeIntervalId !== null) {
+		return;
+	}
+
+	refreshRuntimeState();
+
+	realtimeIntervalId = setInterval(() => {
+		refreshRuntimeState();
+	}, 5000);
+}
+
+async function initPageModule(pageName) {
+	const module = await import(`./${pageName}.js`);
+
+	switch (pageName) {
+		case 'home':
+			if (typeof module.initHome === 'function') {
+				await module.initHome();
+			}
+			break;
+
+		case 'settings':
+			if (typeof module.initSettings === 'function') {
+				await module.initSettings();
+			}
+			break;
+
+		case 'logs':
+			if (typeof module.initLogs === 'function') {
+				await module.initLogs();
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
+async function loadPage(pageName) {
+	if (!pageName) {
+		return;
+	}
+
+	lastRequestedPage = pageName;
+
+	if (isLoadingPage) {
+		return;
+	}
+
+	isLoadingPage = true;
+
+	const currentPage = getElement('current-page');
+
+	if (!currentPage) {
+		isLoadingPage = false;
+		return;
+	}
+
+	try {
+		currentPage.classList.remove('active');
+		currentPage.style.transition = 'opacity 0.4s ease';
+
+		await new Promise(resolve => setTimeout(resolve, 400));
+
+		if (lastRequestedPage !== pageName) {
+			isLoadingPage = false;
+			await loadPage(lastRequestedPage);
+			return;
+		}
+
+		const response = await fetch(`./pages/${pageName}.html`);
+
+		if (!response.ok) {
+			throw new Error(`Failed to fetch page "${pageName}": ${response.status}`);
+		}
+
+		const html = await response.text();
+
+		router_state.isInitializing = true;
+		router_state.current_active_page = pageName;
+
+		currentPage.innerHTML = html;
+		setCSS(pageName);
+
+		if (!router_state.moduleInformation) {
+			await updateModuleInformation();
+		}
+
+		await initPageModule(pageName);
+
+		currentPage.classList.add('active');
+		updateCurrentPageUI();
+	} catch (error) {
+		console.error(`Failed to load page "${pageName}":`, error);
+		addLog(`Failed to load page "${pageName}".`);
+		setErrorPage();
+	} finally {
+		isLoadingPage = false;
+	}
+}
+
+function bindNavigation() {
 	const navLinks = document.querySelectorAll('.footer-nav .nav-item');
 
-	function loadPage(pageName) {
-		return new Promise(async (resolve, reject) => {
-			const currentPage = document.getElementById('current-page');
-			const contentContainer = document.getElementById('page-content');
-			
-			// Start exit animation
-			currentPage.classList.remove('active');
-			currentPage.style.transition = 'opacity 0.4s ease';
-			
-			setTimeout(() => {
-				fetch(`./pages/${pageName}.html`)
-				.then(response => response.text())
-				.then(html => {
-					router_state.isInitializing = true;
-					router_state.current_active_page = pageName;
-					
-					currentPage.innerHTML = html;
-					setCSS(pageName);
-					
-					if (!router_state.moduleInformation) {
-						updateModuleInformation().then(res => {});
-					}
-					
-					// Load page-specific script
-					import(`./${pageName}.js`).then(module => {
-						switch (pageName) {
-							case 'home':
-								module.initHome();
-								break;
-							case 'settings':
-								module.initSettings();
-								break;
-							case 'logs':
-								module.initLogs();
-								break;
-						}
-						
-						// Trigger entry animation
-						currentPage.classList.add('active');
-						resolve();
-					}).catch(err => {
-					  console.error("Failed to load page script:", err);
-					  contentContainer.innerHTML = `
-					  <div style="display: flex; justify-content: center; align-items: center; height: 100%; flex-direction: column;">
-						<p>⚠️⚠️⚠️ Error loading page. ⚠️⚠️⚠️</p>
-					  </div>`;
-					reject(err);
-					});
-				  })
-				  .catch(err => {
-					console.error("Failed to load page content:", err);
-					contentContainer.innerHTML = `
-					  <div style="display: flex; justify-content: center; align-items: center; height: 100%; flex-direction: column;">
-						<p>⚠️⚠️⚠️ Error loading page. ⚠️⚠️⚠️</p>
-					  </div>`;
-					reject(err);
-				  });
-			}, 400); // Wait for exit animation to finish
-		});
-	}
+	navLinks.forEach(link => {
+		if (link.dataset.bound === 'true') {
+			return;
+		}
 
-	// Set default page
-	loadPage('home').then(() => {
-		realtimeUpdater();
-		// Add click event to nav links
-		navLinks.forEach(link => {
-			link.addEventListener('click', (e) => {
-				e.preventDefault();
-				const page = e.currentTarget.dataset.page;
-				navLinks.forEach(l => l.classList.remove('active'));
-				e.currentTarget.classList.add('active');
-				loadPage(page);
-			});
-		  });
+		link.dataset.bound = 'true';
+
+		link.addEventListener('click', async (event) => {
+			event.preventDefault();
+
+			const page = event.currentTarget.dataset.page;
+
+			if (!page || page === router_state.current_active_page) {
+				return;
+			}
+
+			navLinks.forEach(item => item.classList.remove('active'));
+			event.currentTarget.classList.add('active');
+
+			await loadPage(page);
+		});
 	});
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+	try {
+		bindNavigation();
+
+		await loadPage('home');
+
+		startRealtimeUpdater();
+	} catch (error) {
+		console.error('Router initialization failed:', error);
+		addLog('Router initialization failed.');
+		setErrorPage();
+	}
 });
 
 export default router_state;
