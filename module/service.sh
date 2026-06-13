@@ -28,11 +28,9 @@ kill_tcp_connections() {
 	if [ -f "$MODPATH/kill_connections" ]; then
 		log_print "Killing TCP connections due to congestion change"
 
-		# Prefer killing established TCP connections only, if supported.
 		if ss -K state established >/dev/null 2>&1; then
 			log_print "Killed established TCP connections"
 		else
-			# Fallback for ss versions that do not support the state filter.
 			ss -K >/dev/null 2>&1
 			log_print "Killed TCP connections using fallback ss -K"
 		fi
@@ -73,28 +71,86 @@ EOF
 	fi
 }
 
+get_selected_qdisc() {
+	local prefix="$1"
+	local default_qdisc="fq_codel"
+	local marker=""
+	local qdisc=""
+
+	marker="$(find "$MODPATH" -maxdepth 1 -type f -name "${prefix}_qdisc_*" -print -quit 2>/dev/null)"
+	qdisc="${marker##${MODPATH}/${prefix}_qdisc_}"
+
+	case "$qdisc" in
+		fq_codel|fq|pfifo_fast)
+			printf '%s\n' "$qdisc"
+			;;
+		*)
+			printf '%s\n' "$default_qdisc"
+			;;
+	esac
+}
+
+get_qdisc_prefix_for_iface() {
+	local iface="$1"
+
+	case "$iface" in
+		wlan*|swlan*)
+			printf '%s\n' "wlan"
+			;;
+
+		rmnet*|rmnet_data*|ccmni*|ccmni-lan*|ccmni-wan*)
+			printf '%s\n' "rmnet_data"
+			;;
+
+		*)
+			printf '%s\n' "wlan"
+			;;
+	esac
+}
+
 set_qdisc() {
 	local iface="$1"
 	local qdisc="$2"
 
+	[ -z "$iface" ] && return 1
+	[ -z "$qdisc" ] && qdisc="fq_codel"
+
+	case "$qdisc" in
+		fq_codel|fq|pfifo_fast)
+			;;
+		*)
+			log_print "Invalid qdisc requested: $qdisc. Falling back to fq_codel."
+			qdisc="fq_codel"
+			;;
+	esac
+
 	if run_as_su "tc qdisc replace dev $iface root $qdisc"; then
 		log_print "Applied qdisc: $qdisc ($iface)"
 		return 0
-	else
-		log_print "Failed to apply qdisc: $qdisc ($iface)"
-		return 1
 	fi
+
+	if [ "$qdisc" != "fq_codel" ]; then
+		log_print "Failed to apply qdisc: $qdisc ($iface). Trying fq_codel fallback."
+
+		if run_as_su "tc qdisc replace dev $iface root fq_codel"; then
+			log_print "Applied fallback qdisc: fq_codel ($iface)"
+			return 0
+		fi
+	fi
+
+	log_print "Failed to apply qdisc on $iface"
+	return 1
 }
 
-set_bbr_qdisc_if_needed() {
+apply_selected_qdisc() {
 	local iface="$1"
-	local algo="$2"
+	local prefix=""
+	local qdisc=""
 
-	case "$algo" in
-		bbr|bbrv3)
-			set_qdisc "$iface" "fq" || set_qdisc "$iface" "fq_codel"
-			;;
-	esac
+	prefix="$(get_qdisc_prefix_for_iface "$iface")"
+	qdisc="$(get_selected_qdisc "$prefix")"
+
+	set_qdisc "$iface" "$qdisc"
 }
 
 set_congestion() {
@@ -138,13 +194,10 @@ apply_wifi_settings() {
 
 	if [ -n "$freq" ]; then
 		if [ "$freq" -lt 3000 ]; then
-			# 2.4 GHz
 			set_tcp_pacing 150 200
 		elif [ "$freq" -lt 6000 ]; then
-			# 5 GHz
 			set_tcp_pacing 200 300
 		else
-			# 6 GHz or higher
 			set_tcp_pacing 250 350
 		fi
 	fi
@@ -152,7 +205,7 @@ apply_wifi_settings() {
 	for algo in $congestion_algorithms; do
 		if [ -f "$MODPATH/wlan_$algo" ]; then
 			set_congestion "$algo" "Wi-Fi"
-			set_bbr_qdisc_if_needed "$iface" "$algo"
+			apply_selected_qdisc "$iface"
 			set_max_initcwnd_initrwnd "$iface"
 			applied=1
 			break
@@ -161,6 +214,7 @@ apply_wifi_settings() {
 
 	if [ "$applied" -eq 0 ]; then
 		set_congestion cubic "Wi-Fi"
+		apply_selected_qdisc "$iface"
 		set_max_initcwnd_initrwnd "$iface"
 	fi
 
@@ -176,7 +230,7 @@ apply_cellular_settings() {
 	for algo in $congestion_algorithms; do
 		if [ -f "$MODPATH/rmnet_data_$algo" ]; then
 			set_congestion "$algo" "Cellular"
-			set_bbr_qdisc_if_needed "$iface" "$algo"
+			apply_selected_qdisc "$iface"
 			set_max_initcwnd_initrwnd "$iface"
 			applied=1
 			break
@@ -185,6 +239,7 @@ apply_cellular_settings() {
 
 	if [ "$applied" -eq 0 ]; then
 		set_congestion cubic "Cellular"
+		apply_selected_qdisc "$iface"
 		set_max_initcwnd_initrwnd "$iface"
 	fi
 
@@ -192,14 +247,15 @@ apply_cellular_settings() {
 }
 
 apply_base_tcp_settings() {
+	local default_qdisc=""
+
 	# IPv4 TCP optimizations
 	echo 1 > /proc/sys/net/ipv4/tcp_ecn 2>/dev/null
 
-	if echo "$congestion_algorithms" | grep -qw bbrv3 || echo "$congestion_algorithms" | grep -qw bbr; then
-		echo "fq" > /proc/sys/net/core/default_qdisc 2>/dev/null
-	else
-		echo "fq_codel" > /proc/sys/net/core/default_qdisc 2>/dev/null
-	fi
+	# Default qdisc should be marker-based, not automatically forced to fq for BBR.
+	default_qdisc="$(get_selected_qdisc wlan)"
+	echo "$default_qdisc" > /proc/sys/net/core/default_qdisc 2>/dev/null
+	log_print "Applied default qdisc: $default_qdisc"
 
 	echo 150 > /proc/sys/net/ipv4/tcp_pacing_ca_ratio 2>/dev/null
 	echo 200 > /proc/sys/net/ipv4/tcp_pacing_ss_ratio 2>/dev/null
@@ -214,8 +270,6 @@ apply_base_tcp_settings() {
 	# IPv6 TCP tuning
 	[ -w /proc/sys/net/ipv6/tcp_ecn ] && echo 1 > /proc/sys/net/ipv6/tcp_ecn
 
-	# These paths usually do not exist on many Android/Linux kernels.
-	# Keep guarded support for kernels that expose them.
 	[ -w /proc/sys/net/ipv6/tcp_rmem ] && echo "4096 87380 16777216" > /proc/sys/net/ipv6/tcp_rmem
 	[ -w /proc/sys/net/ipv6/tcp_wmem ] && echo "4096 65536 16777216" > /proc/sys/net/ipv6/tcp_wmem
 }
@@ -227,6 +281,9 @@ if [ -f "$MODPATH/module.prop" ]; then
 	default_desc="TCP Optimisations & update tcp_cong_algo based on interface"
 	sed -i "s|^description=.*|description=$default_desc|" "$MODPATH/module.prop"
 fi
+
+log_print "TCP Optimiser service started."
+log_print "Available congestion algorithms: $congestion_algorithms"
 
 apply_base_tcp_settings
 
@@ -244,8 +301,8 @@ while true; do
 	new_mode="none"
 
 	case "$iface" in
-		wlan*) new_mode="Wi-Fi" ;;
-		rmnet*|ccmni*) new_mode="Cellular" ;;
+		wlan*|swlan*) new_mode="Wi-Fi" ;;
+		rmnet*|rmnet_data*|ccmni*|ccmni-lan*|ccmni-wan*) new_mode="Cellular" ;;
 		tun*) new_mode="Tunnel" ;;
 		*) new_mode="none" ;;
 	esac
@@ -253,7 +310,6 @@ while true; do
 	if [ "$new_mode" != "$last_mode" ] || [ -f "$MODPATH/force_apply" ]; then
 		if [ "$((current_time - change_time))" -ge "$DEBOUNCE_TIME" ]; then
 			if [ "$new_mode" = "Wi-Fi" ]; then
-				# Start waiting for VoWiFi
 				vowifi_pending=1
 				vowifi_start_time="$current_time"
 			elif [ "$new_mode" = "Cellular" ]; then
