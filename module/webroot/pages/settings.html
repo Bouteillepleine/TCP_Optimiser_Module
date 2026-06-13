@@ -1,55 +1,76 @@
-<div class="card settings">
-  <div class="card-header">
-	<h3>Settings</h3>
-  </div>
-  
-  <div class="collapsible-group">
-    <div class="collapsible-header">
-      <h4>TCP Settings</h4>
-      <span class="arrow">▼</span>
-    </div>
-    <div class="collapsible-content">
-	  <div class="setting-group">
-		<div class="setting-row">
-		  <label for="wifi-algo">TCP Congestion Algorithm (Wi-Fi)</label>
-		  <select id="wifi-algo" class="dropdown">
-			<option value="none">Loading Options</option>
-		  </select>
-		</div>
-	  </div>
-
-	  <div class="setting-group">
-		<div class="setting-row">
-		  <label for="cellular-algo">TCP Congestion Algorithm (Cellular)</label>
-		  <select id="cellular-algo" class="dropdown">
-			<option value="none">Loading Options</option>
-		  </select>
-		</div>
-	  </div>
-
-	  <div class="setting-group toggle-container">
-		<label id="kill-connections-label" for="kill-connections">Kill Connections on Change</label>
-		<label class="toggle">
-		  <input type="checkbox" id="kill-connections">
-		  <span class="slider"></span>
-		</label>
-	  </div>
-
-	  <div class="setting-group toggle-container">
-		<label id="initcwnd-initrwnd-label" for="initcwnd-initrwnd">Set Max initcwnd & initrwnd</label>
-		<label class="toggle">
-		  <input type="checkbox" id="initcwnd-initrwnd">
-		  <span class="slider"></span>
-		</label>
-	  </div>
-	</div>
-  </div>
-  
-	<div class="setting-group toggle-container">
-		<button id="apply" class="apply-btn">Apply</button>
+<div class="card settings" aria-labelledby="settings-title">
+	<div class="card-header">
+		<h3 id="settings-title">Settings</h3>
 	</div>
 
-	<div class="setting-group toggle-container">
-		<button id="force-apply" class="apply-btn">Force Apply</button>
+	<div class="collapsible-group">
+		<button
+			class="collapsible-header"
+			type="button"
+			aria-expanded="false"
+			aria-controls="tcp-settings-content"
+		>
+			<span class="collapsible-title">TCP Settings</span>
+			<span class="arrow" aria-hidden="true">▼</span>
+		</button>
+
+		<div
+			id="tcp-settings-content"
+			class="collapsible-content collapsed"
+			role="region"
+			aria-label="TCP Settings"
+		>
+			<div class="setting-group">
+				<div class="setting-row">
+					<label for="wifi-algo">TCP Congestion Algorithm (Wi-Fi)</label>
+
+					<select id="wifi-algo" class="dropdown">
+						<option value="">Loading Options...</option>
+					</select>
+				</div>
+			</div>
+
+			<div class="setting-group">
+				<div class="setting-row">
+					<label for="cellular-algo">TCP Congestion Algorithm (Cellular)</label>
+
+					<select id="cellular-algo" class="dropdown">
+						<option value="">Loading Options...</option>
+					</select>
+				</div>
+			</div>
+
+			<div class="setting-group toggle-container">
+				<label id="kill-connections-label" for="kill-connections">
+					Kill Connections on Change
+				</label>
+
+				<label class="toggle" aria-labelledby="kill-connections-label">
+					<input type="checkbox" id="kill-connections">
+					<span class="slider" aria-hidden="true"></span>
+				</label>
+			</div>
+
+			<div class="setting-group toggle-container">
+				<label id="initcwnd-initrwnd-label" for="initcwnd-initrwnd">
+					Set Max initcwnd & initrwnd
+				</label>
+
+				<label class="toggle" aria-labelledby="initcwnd-initrwnd-label">
+					<input type="checkbox" id="initcwnd-initrwnd">
+					<span class="slider" aria-hidden="true"></span>
+				</label>
+			</div>
+		</div>
+	</div>
+
+	<div class="settings-actions">
+		<button id="apply" class="apply-btn" type="button">
+			Apply
+		</button>
+
+		<button id="force-apply" class="apply-btn secondary" type="button">
+			Force Apply
+		</button>
 	</div>
 </div>
