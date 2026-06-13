@@ -71,12 +71,19 @@ function setLogsHeading(count = 0) {
 	heading.textContent = `${logHeadingDefaultValue}${count > 0 ? ` (${count})` : ''}`;
 }
 
-function clearLogContent() {
+function setLogContent(text = '') {
 	const logContent = getElement('log-content');
 
-	if (logContent) {
-		logContent.textContent = '';
+	if (!logContent) {
+		return;
 	}
+
+	logContent.textContent = text;
+	logContent.scrollTop = logContent.scrollHeight;
+}
+
+function clearLogContent() {
+	setLogContent('');
 }
 
 function ensureLogFileCommand() {
@@ -97,13 +104,22 @@ function addLogToScreen(message, withTimestamp = false) {
 		return;
 	}
 
-	const logEntry = document.createElement('div');
-
-	logEntry.textContent = withTimestamp
+	const line = withTimestamp
 		? `${formatLocalDateTime()} - ${message}`
 		: `${message}`;
 
-	logContent.appendChild(logEntry);
+	const currentText = logContent.textContent || '';
+
+	if (
+		!currentText ||
+		currentText === 'Loading logs...' ||
+		currentText === 'No logs available yet.'
+	) {
+		logContent.textContent = line;
+	} else {
+		logContent.textContent = `${currentText}\n${line}`;
+	}
+
 	logContent.scrollTop = logContent.scrollHeight;
 }
 
@@ -210,7 +226,9 @@ export function updateLogsUI() {
 		? router_state.logsList
 		: [];
 
-	const logsContent = logs.join('\n');
+	const logsContent = logs.length > 0
+		? logs.join('\n')
+		: 'No logs available yet.';
 
 	if (
 		logs.length === prev_logs_count &&
@@ -220,15 +238,7 @@ export function updateLogsUI() {
 	}
 
 	setLogsHeading(logs.length);
-	clearLogContent();
-
-	if (logs.length === 0) {
-		addLogToScreen('No logs available yet.');
-	} else {
-		logs.forEach(log => {
-			addLogToScreen(log);
-		});
-	}
+	setLogContent(logsContent);
 
 	prev_logs_count = logs.length;
 	prev_logs_content = logsContent;
@@ -249,9 +259,6 @@ export async function clearLogs() {
 			`chmod 644 ${shellQuote(logFile)} && ` +
 			`touch "/dev/.tcp_module_log_cleared" 2>/dev/null || true`
 		);
-
-		clearLogContent();
-		setLogsHeading(0);
 
 		router_state.logsList = [];
 		prev_logs_count = -1;
