@@ -1,74 +1,157 @@
-/* Shared icon behavior */
-.icon,
-.nav-icon {
-	flex-shrink: 0;
-	color: currentColor;
+.logs-card {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
 }
 
-/* Bottom navigation icons */
-.nav-icon {
+.logs-actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.logs-actions .button,
+.logs-actions button {
+	min-height: 38px;
+	padding: 9px 12px;
+
+	border: 1px solid var(--border-color);
+	border-radius: 10px;
+
+	background: var(--input-bg, rgba(255, 255, 255, 0.04));
+	color: var(--text);
+
+	font-size: 0.9rem;
+	font-weight: 600;
+
+	cursor: pointer;
+
+	appearance: none;
+	-webkit-appearance: none;
+
+	transition:
+		background 0.2s ease,
+		border-color 0.2s ease,
+		transform 0.15s ease,
+		opacity 0.2s ease;
+}
+
+.logs-actions .button:active,
+.logs-actions button:active {
+	transform: scale(0.97);
+	opacity: 0.85;
+}
+
+.logs-actions .button.primary,
+.logs-actions button.primary {
+	background: var(--primary);
+	border-color: var(--primary);
+	color: var(--button-text, #121212);
+}
+
+.logs-actions .button.danger,
+.logs-actions button.danger {
+	background: rgba(248, 113, 113, 0.14);
+	border-color: rgba(248, 113, 113, 0.35);
+	color: #f87171;
+}
+
+.logs-meta {
+	color: var(--text-secondary);
+	font-size: 0.82rem;
+	line-height: 1.35;
+}
+
+.log-box {
+	width: 100%;
+
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+
+	background:
+		linear-gradient(
+			180deg,
+			rgba(255, 255, 255, 0.035),
+			rgba(255, 255, 255, 0.015)
+		),
+		var(--log-bg, rgba(255, 255, 255, 0.06));
+
+	overflow: hidden;
+}
+
+#log-content {
 	display: block;
-	width: 24px;
-	height: 24px;
-	margin-bottom: 4px;
+
+	width: 100%;
+	min-height: 260px;
+	max-height: 58vh;
+
+	margin: 0;
+	padding: 12px;
+
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+
+	color: var(--log-text, var(--text));
+	background: transparent;
+
+	font-family:
+		ui-monospace,
+		SFMono-Regular,
+		Menlo,
+		Monaco,
+		Consolas,
+		"Liberation Mono",
+		"Courier New",
+		monospace;
+
+	font-size: 0.78rem;
+	line-height: 1.45;
+
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+
+	tab-size: 2;
+	user-select: text;
+	-webkit-user-select: text;
 }
 
-/* Inline SVG icons */
-svg.nav-icon,
-svg.icon {
-	fill: currentColor;
-	stroke: currentColor;
+#log-content:empty::before {
+	content: "No logs found yet.";
+	color: var(--text-secondary);
 }
 
-/* Generic inline icon */
-.icon {
-	display: inline-block;
-	width: 1em;
-	height: 1em;
-	vertical-align: -0.125em;
+.log-line-info {
+	color: #93c5fd;
 }
 
-/* SVG-only properties */
-svg.icon {
-	stroke-width: 0;
+.log-line-warn {
+	color: #fbbf24;
 }
 
-/*
- * External SVG images used like:
- * <img src="./icons/home.svg" class="nav-icon" alt="">
- *
- * CSS cannot apply fill/currentColor inside external SVG files.
- * Use filters for predictable coloring in Android WebView.
- */
-img.nav-icon {
-	object-fit: contain;
-	opacity: 0.9;
-
-	filter:
-		brightness(0)
-		saturate(100%)
-		invert(66%)
-		sepia(0%)
-		saturate(1%)
-		hue-rotate(170deg)
-		brightness(94%)
-		contrast(88%);
+.log-line-error {
+	color: #f87171;
 }
 
-.nav-item.active img.nav-icon {
-	opacity: 1;
-
-	filter:
-		brightness(0)
-		saturate(100%)
-		invert(74%)
-		sepia(58%)
-		saturate(3795%)
-		hue-rotate(220deg)
-		brightness(101%)
-		contrast(98%);
+.log-line-ok {
+	color: #34d399;
 }
 
-.nav-item.active svg.nav-icon {
-	color: var(--primary);
+@media (max-width: 380px) {
+	.logs-actions {
+		align-items: stretch;
+	}
+
+	.logs-actions .button,
+	.logs-actions button {
+		flex: 1 1 auto;
+	}
+
+	#log-content {
+		min-height: 220px;
+		font-size: 0.74rem;
+	}
 }
