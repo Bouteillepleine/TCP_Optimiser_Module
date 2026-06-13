@@ -1,7 +1,21 @@
-<div class="card logs">
+<div class="card logs" aria-labelledby="logs-heading">
 	<div class="logs-header">
 		<h3 id="logs-heading">Logs</h3>
-		<button id="clear-logs" class="clear-btn">Clear</button>
+
+		<button
+			id="clear-logs"
+			class="clear-btn"
+			type="button"
+			aria-label="Clear logs"
+		>
+			Clear
+		</button>
 	</div>
-	<div id="log-content" class="log-content"></div>
+
+	<pre
+		id="log-content"
+		class="log-content"
+		aria-live="polite"
+		aria-label="Module logs"
+	></pre>
 </div>
