@@ -5,7 +5,7 @@ import router_state from './router.js';
 const logHeadingDefaultValue = 'Logs';
 const MAX_LOG_LINES = 200;
 
-let prev_logs_count = 0;
+let prev_logs_count = -1;
 let isAddingInternalLog = false;
 
 function getModuleDir() {
@@ -38,8 +38,19 @@ function clearLogContent() {
 	const logContent = getElement('log-content');
 
 	if (logContent) {
-		logContent.innerHTML = '';
+		logContent.textContent = '';
 	}
+}
+
+function ensureLogFileCommand() {
+	const moduleDir = getModuleDir();
+	const logFile = getLogFile();
+
+	return [
+		`mkdir -p ${shellQuote(moduleDir)}`,
+		`touch ${shellQuote(logFile)}`,
+		`chmod 644 ${shellQuote(logFile)}`
+	].join(' && ');
 }
 
 export async function addLog(message) {
@@ -54,15 +65,18 @@ export async function addLog(message) {
 		const logFile = getLogFile();
 		const logLine = `${formatLocalDateTime()} - ${message}`;
 
-		await exec(`mkdir -p ${shellQuote(getModuleDir())}`);
+		await exec(ensureLogFileCommand());
 		await exec(`printf '%s\\n' ${shellQuote(logLine)} >> ${shellQuote(logFile)}`);
 
 		const { stdout: lineCountOutput } = await exec(`wc -l < ${shellQuote(logFile)} 2>/dev/null || echo 0`);
 		const lineCount = parseInt(lineCountOutput.trim(), 10) || 0;
 
 		if (lineCount > MAX_LOG_LINES) {
-			const halfLines = Math.floor(MAX_LOG_LINES / 2);
-			await exec(`tail -n ${halfLines} ${shellQuote(logFile)} > ${shellQuote(`${logFile}.tmp`)} && mv ${shellQuote(`${logFile}.tmp`)} ${shellQuote(logFile)}`);
+			await exec(
+				`tail -n ${MAX_LOG_LINES} ${shellQuote(logFile)} > ${shellQuote(`${logFile}.tmp`)} && ` +
+				`mv ${shellQuote(`${logFile}.tmp`)} ${shellQuote(logFile)} && ` +
+				`chmod 644 ${shellQuote(logFile)}`
+			);
 		}
 	} catch (error) {
 		console.error('Error adding to log file:', error);
@@ -77,11 +91,15 @@ export async function read_log_file() {
 	try {
 		const logFile = getLogFile();
 
-		const { stdout: logs } = await exec(`[ -f ${shellQuote(logFile)} ] && cat ${shellQuote(logFile)} || true`);
+		await exec(ensureLogFileCommand());
+
+		const { stdout: logs } = await exec(
+			`tail -n ${MAX_LOG_LINES} ${shellQuote(logFile)} 2>/dev/null || true`
+		);
 
 		router_state.logsList = logs
-			.trim()
 			.split('\n')
+			.map(line => line.trimEnd())
 			.filter(line => line.length > 0);
 	} catch (error) {
 		console.error('Error reading log file:', error);
@@ -104,6 +122,7 @@ function addLogToScreen(message, withTimestamp = false) {
 	}
 
 	const logEntry = document.createElement('div');
+
 	logEntry.textContent = withTimestamp
 		? `${formatLocalDateTime()} - ${message}`
 		: `${message}`;
@@ -145,15 +164,17 @@ export async function initLogs() {
 			try {
 				const logFile = getLogFile();
 
-				await exec(`rm -f ${shellQuote(logFile)}`);
+				await exec(
+					`: > ${shellQuote(logFile)} && ` +
+					`chmod 644 ${shellQuote(logFile)} && ` +
+					`touch "/dev/.tcp_module_log_cleared" 2>/dev/null || true`
+				);
 
 				clearLogContent();
 				setLogsHeading(0);
 
 				router_state.logsList = [];
 				prev_logs_count = 0;
-
-				await exec(`touch "/dev/.tcp_module_log_cleared" 2>/dev/null || true`);
 			} catch (error) {
 				console.error('Error clearing log file:', error);
 				addLogToScreen('Error clearing log file.');
