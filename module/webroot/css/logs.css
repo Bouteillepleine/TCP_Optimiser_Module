@@ -1,55 +1,74 @@
-.logs-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+/* Shared icon behavior */
+.icon,
+.nav-icon {
+	flex-shrink: 0;
+	color: currentColor;
 }
 
-.clear-btn {
-  padding: 6px 12px;
-  background-color: transparent;
-  border: 1px solid var(--primary);
-  color: var(--primary);
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  line-height: 1.2;
-  transition: background-color 0.2s, color 0.2s, opacity 0.2s, transform 0.2s;
+/* Bottom navigation icons */
+.nav-icon {
+	display: block;
+	width: 24px;
+	height: 24px;
+	margin-bottom: 4px;
 }
 
-.clear-btn:active {
-  transform: scale(0.96);
-  opacity: 0.8;
+/* Inline SVG icons */
+svg.nav-icon,
+svg.icon {
+	fill: currentColor;
+	stroke: currentColor;
 }
 
-.logs {
-  min-height: 260px;
-  height: calc(
-    100vh - var(--footer-height) - var(--window-inset-top) - var(--window-inset-bottom) - calc(var(--spacing) * 10)
-  );
-  display: flex;
-  flex-direction: column;
+/* Generic inline icon */
+.icon {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	vertical-align: -0.125em;
 }
 
-.log-content {
-  background-color: #2d2d2d;
-  border-radius: 6px;
-  padding: 12px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 0.85rem;
-  line-height: 1.45;
-  color: var(--text-secondary);
-  margin-bottom: var(--spacing);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  -webkit-overflow-scrolling: touch;
+/* SVG-only properties */
+svg.icon {
+	stroke-width: 0;
 }
 
-.log-content > div {
-  margin-top: 3px;
+/*
+ * External SVG images used like:
+ * <img src="./icons/home.svg" class="nav-icon" alt="">
+ *
+ * CSS cannot apply fill/currentColor inside external SVG files.
+ * Use filters for predictable coloring in Android WebView.
+ */
+img.nav-icon {
+	object-fit: contain;
+	opacity: 0.9;
+
+	filter:
+		brightness(0)
+		saturate(100%)
+		invert(66%)
+		sepia(0%)
+		saturate(1%)
+		hue-rotate(170deg)
+		brightness(94%)
+		contrast(88%);
+}
+
+.nav-item.active img.nav-icon {
+	opacity: 1;
+
+	filter:
+		brightness(0)
+		saturate(100%)
+		invert(74%)
+		sepia(58%)
+		saturate(3795%)
+		hue-rotate(220deg)
+		brightness(101%)
+		contrast(98%);
+}
+
+.nav-item.active svg.nav-icon {
+	color: var(--primary);
 }
