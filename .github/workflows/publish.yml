@@ -5,88 +5,161 @@ on:
     types:
       - published
 
+permissions:
+  contents: write
+
 jobs:
   update-release-info:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
           path: release
+          fetch-depth: 0
 
-      - name: Fetch and checkout branch where tag was created
+      - name: Detect branch for update.json
         working-directory: release
+        shell: bash
         run: |
+          set -euo pipefail
+
           git fetch --all --tags
-          TAG_COMMIT=$(git rev-list -n 1 ${{ github.event.release.tag_name }})
-          BRANCH=$(git branch -r --contains $TAG_COMMIT | grep -v '\->' | grep -v 'HEAD' | head -n1 | sed 's|origin/||' | xargs)
-          
-          if [ -z "$BRANCH" ]; then
-            echo "No branch found for tag commit. Falling back to 'main'."
+
+          TAG="${{ github.event.release.tag_name }}"
+          TAG_COMMIT="$(git rev-list -n 1 "$TAG")"
+          TARGET_COMMITISH="${{ github.event.release.target_commitish }}"
+
+          echo "Release tag: $TAG"
+          echo "Tag commit: $TAG_COMMIT"
+          echo "Release target_commitish: $TARGET_COMMITISH"
+
+          BRANCH=""
+
+          # Prefer target_commitish if it is a real remote branch.
+          if git ls-remote --heads origin "$TARGET_COMMITISH" | grep -q "refs/heads/$TARGET_COMMITISH"; then
+            BRANCH="$TARGET_COMMITISH"
+          fi
+
+          # Prefer main if it contains the tag commit.
+          if [ -z "$BRANCH" ] && git branch -r --contains "$TAG_COMMIT" | grep -q "origin/main"; then
             BRANCH="main"
           fi
-          
-          echo "Tag commit: $TAG_COMMIT"
+
+          # Otherwise pick the first remote branch containing the tag commit.
+          if [ -z "$BRANCH" ]; then
+            BRANCH="$(git branch -r --contains "$TAG_COMMIT" \
+              | grep -v '\->' \
+              | grep -v 'HEAD' \
+              | sed 's|origin/||' \
+              | xargs \
+              | awk '{print $1}')"
+          fi
+
+          # Final fallback.
+          if [ -z "$BRANCH" ]; then
+            echo "No branch found for tag commit. Falling back to main."
+            BRANCH="main"
+          fi
+
           echo "Detected branch: $BRANCH"
-          
-          git checkout $BRANCH
           echo "checked_out_branch=$BRANCH" >> "$GITHUB_ENV"
-
-      - name: Get version info from module.prop
-        id: read_version
-        working-directory: release
-        run: |
-          cd ./module
-          VERSION=$(grep '^version=' module.prop | cut -d'=' -f2)
-          VERSION_CODE=$(grep '^versionCode=' module.prop | cut -d'=' -f2)
-
-          echo "version=$VERSION" >> "$GITHUB_ENV"
-          echo "versionCode=$VERSION_CODE" >> "$GITHUB_ENV"
-
-      - name: Save release body to changelog
-        working-directory: release
-        run: |
-          echo "${{ github.event.release.body }}" > CHANGELOG.md
 
       - name: Checkout manifest branch
         uses: actions/checkout@v4
         with:
           ref: ${{ env.checked_out_branch }}
-          path: ${{ env.checked_out_branch }}
+          path: manifest
+          fetch-depth: 0
 
-      - name: Copy changelog to manifest branch
-        working-directory: ${{ env.checked_out_branch }}
+      - name: Get version info from module.prop
+        working-directory: manifest
+        shell: bash
         run: |
-          cp ../release/CHANGELOG.md CHANGELOG.md
+          set -euo pipefail
 
-      - name: Update update.json in Checked-out branch
-        working-directory: ${{ env.checked_out_branch }}
+          VERSION="$(grep '^version=' ./module/module.prop | cut -d'=' -f2)"
+          VERSION_CODE="$(grep '^versionCode=' ./module/module.prop | cut -d'=' -f2)"
+
+          if [ -z "$VERSION" ] || [ -z "$VERSION_CODE" ]; then
+            echo "Failed to read version or versionCode from module/module.prop"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_ENV"
+          echo "versionCode=$VERSION_CODE" >> "$GITHUB_ENV"
+
+          echo "Version: $VERSION"
+          echo "VersionCode: $VERSION_CODE"
+
+      - name: Save release body to CHANGELOG.md
+        working-directory: manifest
+        shell: bash
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
         run: |
-          cat > update.json <<EOL
+          set -euo pipefail
+
+          if [ -z "${RELEASE_BODY:-}" ]; then
+            cat > CHANGELOG.md <<EOF
+          TCP Optimiser ${{ env.version }}
+
+          No changelog provided.
+          EOF
+          else
+            printf '%s\n' "$RELEASE_BODY" > CHANGELOG.md
+          fi
+
+          echo "Generated CHANGELOG.md:"
+          cat CHANGELOG.md
+
+      - name: Update update.json
+        working-directory: manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${{ github.event.release.tag_name }}"
+          ASSET_NAME="TCP_Optimiser-${{ env.version }}-${{ env.versionCode }}.zip"
+          ZIP_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET_NAME}"
+          CHANGELOG_URL="https://raw.githubusercontent.com/${{ github.repository }}/${{ env.checked_out_branch }}/CHANGELOG.md"
+
+          cat > update.json <<EOF
           {
             "version": "${{ env.version }}",
             "versionCode": ${{ env.versionCode }},
-            "zipUrl": "https://github.com/${{ github.repository }}/releases/latest/download/TCP_Optimiser-${{ env.version }}-${{ env.versionCode }}.zip",
-            "changelog": "https://raw.githubusercontent.com/${{ github.repository }}/${{ env.checked_out_branch }}/CHANGELOG.md"
+            "zipUrl": "$ZIP_URL",
+            "changelog": "$CHANGELOG_URL"
           }
-          EOL
+          EOF
+
           echo "Updated update.json:"
           cat update.json
 
-      - name: Commit and push to Checked-out branch
-        working-directory: ${{ env.checked_out_branch }}
+      - name: Commit and push update.json and CHANGELOG.md
+        working-directory: manifest
+        shell: bash
         run: |
+          set -euo pipefail
+
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
-          git add update.json CHANGELOG.md
-          git commit -m "Update update.json and CHANGELOG.md for version ${{ env.version }}"
-          git push origin ${{ env.checked_out_branch }}
 
-      - name: Upload artifacts (optional)
+          git add update.json CHANGELOG.md
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update update.json and CHANGELOG.md for version ${{ env.version }}"
+            git push origin HEAD:${{ env.checked_out_branch }}
+          fi
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-assets
+          name: release-info
           path: |
-            ${{ env.checked_out_branch }}/CHANGELOG.md
-            ${{ env.checked_out_branch }}/update.json
+            manifest/CHANGELOG.md
+            manifest/update.json
