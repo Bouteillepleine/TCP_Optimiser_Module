@@ -1,21 +1,74 @@
-/* Icon styles */
+/* Shared icon behavior */
+.icon,
 .nav-icon {
-  display: block;
-  width: 24px;
-  height: 24px;
-  margin-bottom: 4px;
-  fill: currentColor;
-  stroke: currentColor;
-  flex-shrink: 0;
+	flex-shrink: 0;
+	color: currentColor;
 }
 
+/* Bottom navigation icons */
+.nav-icon {
+	display: block;
+	width: 24px;
+	height: 24px;
+	margin-bottom: 4px;
+}
+
+/* Inline SVG icons */
+svg.nav-icon,
+svg.icon {
+	fill: currentColor;
+	stroke: currentColor;
+}
+
+/* Generic inline icon */
 .icon {
-  display: inline-block;
-  width: 1em;
-  height: 1em;
-  stroke-width: 0;
-  stroke: currentColor;
-  fill: currentColor;
-  vertical-align: -0.125em;
-  flex-shrink: 0;
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	vertical-align: -0.125em;
+}
+
+/* SVG-only properties */
+svg.icon {
+	stroke-width: 0;
+}
+
+/*
+ * External SVG images used like:
+ * <img src="./icons/home.svg" class="nav-icon">
+ *
+ * CSS cannot apply fill/currentColor inside external SVG files.
+ * These filters approximate text-secondary and primary colors.
+ */
+img.nav-icon {
+	object-fit: contain;
+	opacity: 0.9;
+
+	filter:
+		brightness(0)
+		saturate(100%)
+		invert(66%)
+		sepia(0%)
+		saturate(1%)
+		hue-rotate(170deg)
+		brightness(94%)
+		contrast(88%);
+}
+
+.nav-item.active img.nav-icon {
+	opacity: 1;
+
+	filter:
+		brightness(0)
+		saturate(100%)
+		invert(74%)
+		sepia(58%)
+		saturate(3795%)
+		hue-rotate(220deg)
+		brightness(101%)
+		contrast(98%);
+}
+
+.nav-item.active svg.nav-icon {
+	color: var(--primary);
 }
