@@ -2,6 +2,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -13,10 +14,20 @@
   border-radius: 20px;
   cursor: pointer;
   font-size: 0.9rem;
+  line-height: 1.2;
+  transition: background-color 0.2s, color 0.2s, opacity 0.2s, transform 0.2s;
+}
+
+.clear-btn:active {
+  transform: scale(0.96);
+  opacity: 0.8;
 }
 
 .logs {
-  height: calc(100vh - var(--footer-height) - calc(var(--spacing) * 10));
+  min-height: 260px;
+  height: calc(
+    100vh - var(--footer-height) - var(--window-inset-top) - var(--window-inset-bottom) - calc(var(--spacing) * 10)
+  );
   display: flex;
   flex-direction: column;
 }
@@ -26,11 +37,17 @@
   border-radius: 6px;
   padding: 12px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  font-family: monospace;
-  font-size: 0.9rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
   color: var(--text-secondary);
   margin-bottom: var(--spacing);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-overflow-scrolling: touch;
 }
 
 .log-content > div {
