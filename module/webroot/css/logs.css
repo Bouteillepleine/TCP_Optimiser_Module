@@ -1,157 +1,38 @@
-.logs-card {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
-.logs-actions {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 10px;
-	flex-wrap: wrap;
+.clear-btn {
+  padding: 6px 12px;
+  background-color: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
 }
 
-.logs-actions .button,
-.logs-actions button {
-	min-height: 38px;
-	padding: 9px 12px;
-
-	border: 1px solid var(--border-color);
-	border-radius: 10px;
-
-	background: var(--input-bg, rgba(255, 255, 255, 0.04));
-	color: var(--text);
-
-	font-size: 0.9rem;
-	font-weight: 600;
-
-	cursor: pointer;
-
-	appearance: none;
-	-webkit-appearance: none;
-
-	transition:
-		background 0.2s ease,
-		border-color 0.2s ease,
-		transform 0.15s ease,
-		opacity 0.2s ease;
+.logs {
+  height: calc(100vh - var(--footer-height) - calc(var(--spacing) * 10));
+  display: flex;
+  flex-direction: column;
 }
 
-.logs-actions .button:active,
-.logs-actions button:active {
-	transform: scale(0.97);
-	opacity: 0.85;
+.log-content {
+  background-color: #2d2d2d;
+  border-radius: 6px;
+  padding: 12px;
+  flex: 1;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing);
 }
 
-.logs-actions .button.primary,
-.logs-actions button.primary {
-	background: var(--primary);
-	border-color: var(--primary);
-	color: var(--button-text, #121212);
-}
-
-.logs-actions .button.danger,
-.logs-actions button.danger {
-	background: rgba(248, 113, 113, 0.14);
-	border-color: rgba(248, 113, 113, 0.35);
-	color: #f87171;
-}
-
-.logs-meta {
-	color: var(--text-secondary);
-	font-size: 0.82rem;
-	line-height: 1.35;
-}
-
-.log-box {
-	width: 100%;
-
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius);
-
-	background:
-		linear-gradient(
-			180deg,
-			rgba(255, 255, 255, 0.035),
-			rgba(255, 255, 255, 0.015)
-		),
-		var(--log-bg, rgba(255, 255, 255, 0.06));
-
-	overflow: hidden;
-}
-
-#log-content {
-	display: block;
-
-	width: 100%;
-	min-height: 260px;
-	max-height: 58vh;
-
-	margin: 0;
-	padding: 12px;
-
-	overflow: auto;
-	-webkit-overflow-scrolling: touch;
-
-	color: var(--log-text, var(--text));
-	background: transparent;
-
-	font-family:
-		ui-monospace,
-		SFMono-Regular,
-		Menlo,
-		Monaco,
-		Consolas,
-		"Liberation Mono",
-		"Courier New",
-		monospace;
-
-	font-size: 0.78rem;
-	line-height: 1.45;
-
-	white-space: pre-wrap;
-	overflow-wrap: anywhere;
-	word-break: break-word;
-
-	tab-size: 2;
-	user-select: text;
-	-webkit-user-select: text;
-}
-
-#log-content:empty::before {
-	content: "No logs found yet.";
-	color: var(--text-secondary);
-}
-
-.log-line-info {
-	color: #93c5fd;
-}
-
-.log-line-warn {
-	color: #fbbf24;
-}
-
-.log-line-error {
-	color: #f87171;
-}
-
-.log-line-ok {
-	color: #34d399;
-}
-
-@media (max-width: 380px) {
-	.logs-actions {
-		align-items: stretch;
-	}
-
-	.logs-actions .button,
-	.logs-actions button {
-		flex: 1 1 auto;
-	}
-
-	#log-content {
-		min-height: 220px;
-		font-size: 0.74rem;
-	}
+.log-content > div {
+  margin-top: 3px;
 }
