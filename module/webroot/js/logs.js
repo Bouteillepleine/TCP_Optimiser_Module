@@ -24,6 +24,38 @@ function getElement(id) {
 	return document.getElementById(id);
 }
 
+function normalizeExecOutput(result) {
+	if (typeof result === 'string') {
+		return result;
+	}
+
+	if (!result) {
+		return '';
+	}
+
+	if (typeof result.stdout === 'string') {
+		return result.stdout;
+	}
+
+	if (typeof result.out === 'string') {
+		return result.out;
+	}
+
+	if (typeof result.output === 'string') {
+		return result.output;
+	}
+
+	if (typeof result.result === 'string') {
+		return result.result;
+	}
+
+	if (typeof result.stderr === 'string' && result.stderr.trim()) {
+		return result.stderr;
+	}
+
+	return '';
+}
+
 function setLogsHeading(count = 0) {
 	const heading = getElement('logs-heading');
 
@@ -66,18 +98,28 @@ export async function addLog(message) {
 		const logLine = `${formatLocalDateTime()} - ${message}`;
 
 		await exec(ensureLogFileCommand());
-		await exec(`printf '%s\\n' ${shellQuote(logLine)} >> ${shellQuote(logFile)}`);
 
-		const { stdout: lineCountOutput } = await exec(`wc -l < ${shellQuote(logFile)} 2>/dev/null || echo 0`);
-		const lineCount = parseInt(lineCountOutput.trim(), 10) || 0;
+		await exec(
+			`printf '%s\\n' ${shellQuote(logLine)} | tee -a ${shellQuote(logFile)} >/dev/null`
+		);
+
+		const result = await exec(
+			`wc -l < ${shellQuote(logFile)} 2>/dev/null || echo 0`
+		);
+
+		const lineCountOutput = normalizeExecOutput(result);
+		const lineCount = parseInt((lineCountOutput || '').trim(), 10) || 0;
 
 		if (lineCount > MAX_LOG_LINES) {
 			await exec(
-				`tail -n ${MAX_LOG_LINES} ${shellQuote(logFile)} > ${shellQuote(`${logFile}.tmp`)} && ` +
+				`tail -n ${MAX_LOG_LINES} ${shellQuote(logFile)} | tee ${shellQuote(`${logFile}.tmp`)} >/dev/null && ` +
 				`mv ${shellQuote(`${logFile}.tmp`)} ${shellQuote(logFile)} && ` +
 				`chmod 644 ${shellQuote(logFile)}`
 			);
 		}
+
+		await read_log_file();
+		updateLogsUI();
 	} catch (error) {
 		console.error('Error adding to log file:', error);
 		addLogToScreen('Error Adding to log file.');
@@ -93,22 +135,23 @@ export async function read_log_file() {
 
 		await exec(ensureLogFileCommand());
 
-		const { stdout: logs } = await exec(
+		const result = await exec(
 			`tail -n ${MAX_LOG_LINES} ${shellQuote(logFile)} 2>/dev/null || true`
 		);
+
+		const logs = normalizeExecOutput(result);
 
 		router_state.logsList = logs
 			.split('\n')
 			.map(line => line.trimEnd())
 			.filter(line => line.length > 0);
+
+		prev_logs_count = -1;
 	} catch (error) {
 		console.error('Error reading log file:', error);
 
-		addLogToScreen('Error reading log file.');
-
-		try {
-			await addLog('Error reading log file.');
-		} catch (_) {}
+		router_state.logsList = ['Error reading log file.'];
+		prev_logs_count = -1;
 
 		toast('Error reading log file.');
 	}
@@ -164,8 +207,10 @@ export async function initLogs() {
 			try {
 				const logFile = getLogFile();
 
+				await exec(ensureLogFileCommand());
+
 				await exec(
-					`: > ${shellQuote(logFile)} && ` +
+					`printf '' | tee ${shellQuote(logFile)} >/dev/null && ` +
 					`chmod 644 ${shellQuote(logFile)} && ` +
 					`touch "/dev/.tcp_module_log_cleared" 2>/dev/null || true`
 				);
@@ -182,6 +227,8 @@ export async function initLogs() {
 			}
 		});
 	}
+
+	await read_log_file();
 
 	router_state.isInitializing = false;
 	updateLogsUI();
