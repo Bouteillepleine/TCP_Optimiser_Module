@@ -11,7 +11,7 @@ function shellQuote(value) {
 }
 
 function parseModuleProp(details) {
-	const lines = details
+	const lines = String(details || '')
 		.trim()
 		.split('\n')
 		.map(line => line.trim())
@@ -46,20 +46,32 @@ async function readModuleProp() {
 	}
 }
 
-export async function updateModuleInformation() {
+async function getModuleInfoFromApi() {
 	try {
-		let infoFromApi = null;
+		const rawInfo = await moduleInfo();
 
-		try {
-			const rawInfo = moduleInfo();
-
-			if (rawInfo) {
-				infoFromApi = JSON.parse(rawInfo);
-			}
-		 } catch (error) {
-			console.warn('moduleInfo() unavailable or invalid, falling back to module.prop:', error);
+		if (!rawInfo) {
+			return null;
 		}
 
+		if (typeof rawInfo === 'string') {
+			return JSON.parse(rawInfo);
+		}
+
+		if (typeof rawInfo === 'object') {
+			return rawInfo;
+		}
+
+		return null;
+	} catch (error) {
+		console.warn('moduleInfo() unavailable or invalid, falling back to module.prop:', error);
+		return null;
+	}
+}
+
+export async function updateModuleInformation() {
+	try {
+		const infoFromApi = await getModuleInfoFromApi();
 		const infoFromProp = await readModuleProp();
 
 		router_state.moduleInformation = {
@@ -105,7 +117,10 @@ export async function getModuleActiveState() {
 
 export async function get_active_iface() {
 	try {
-		const { stdout: activeIface } = await exec(`ip route get 192.0.2.1 2>/dev/null | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") print $(i+1); exit}'`);
+		const { stdout: activeIface } = await exec(
+			`ip route get 192.0.2.1 2>/dev/null | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") print $(i+1); exit}'`
+		);
+
 		return activeIface.trim() || 'unknown';
 	} catch (error) {
 		console.error('Error fetching active interface:', error);
@@ -130,6 +145,7 @@ export async function get_active_algorithm() {
 export async function get_available_algorithms() {
 	try {
 		const { stdout: availableAlgos } = await exec(`cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null`);
+
 		return availableAlgos
 			.trim()
 			.split(/\s+/)
@@ -153,9 +169,69 @@ export async function get_default_qdisc() {
 	}
 }
 
+export async function get_active_qdisc(iface) {
+	try {
+		if (!iface || iface === 'unknown' || iface === 'error') {
+			return 'unknown';
+		}
+
+		const { stdout } = await exec(
+			`tc qdisc show dev ${shellQuote(iface)} 2>/dev/null | awk 'NR==1 {print $2}'`
+		);
+
+		return stdout.trim() || 'unknown';
+	} catch (error) {
+		console.error('Error fetching active qdisc:', error);
+		addLog('Error fetching active qdisc.');
+		return 'error';
+	}
+}
+
+export async function get_selected_qdisc(prefix) {
+	try {
+		const moduleDir = router_state.moduleInformation?.moduleDir || MODULE_DIR;
+
+		const safePrefix = prefix === 'rmnet_data' ? 'rmnet_data' : 'wlan';
+
+		const { stdout } = await exec(
+			`find ${shellQuote(moduleDir)} -maxdepth 1 -type f -name ${shellQuote(`${safePrefix}_qdisc_*`)} -print -quit 2>/dev/null`
+		);
+
+		const markerPath = stdout.trim();
+
+		if (!markerPath) {
+			return 'fq_codel';
+		}
+
+		const markerName = markerPath.split('/').pop();
+		const qdisc = markerName.replace(`${safePrefix}_qdisc_`, '');
+
+		return ['fq_codel', 'fq', 'pfifo_fast'].includes(qdisc)
+			? qdisc
+			: 'fq_codel';
+	} catch (error) {
+		console.error('Error fetching selected qdisc:', error);
+		addLog('Error fetching selected qdisc.');
+		return 'fq_codel';
+	}
+}
+
+export function get_qdisc_prefix_for_iface(iface) {
+	if (/^(wlan|swlan)/.test(iface || '')) {
+		return 'wlan';
+	}
+
+	if (/^(rmnet|rmnet_data|ccmni)/.test(iface || '')) {
+		return 'rmnet_data';
+	}
+
+	return 'wlan';
+}
+
 export async function getInitcwndInitrwndValue() {
 	try {
 		const { stdout } = await exec(`ip route show 2>/dev/null | grep -m1 -o 'initcwnd [0-9]* initrwnd [0-9]*' || true`);
+
 		const values = stdout
 			.trim()
 			.split(/\s+/)
@@ -179,7 +255,9 @@ export async function get_wifi_calling_state() {
 
 		await exec(`dumpsys activity service SystemUIService > ${quotedTmp} 2>/dev/null`);
 
-		const { stdout } = await exec(`grep -qE "slot='vowifi'.*visible user=.*" ${quotedTmp} && echo "active" || echo "inactive"`);
+		const { stdout } = await exec(
+			`grep -qE "slot='vowifi'.*visible user=.*" ${quotedTmp} && echo "active" || echo "inactive"`
+		);
 
 		await exec(`rm -f ${quotedTmp}`);
 
