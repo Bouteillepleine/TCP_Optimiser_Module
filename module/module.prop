@@ -1,7 +1,7 @@
 id=tcp_optimiser
 name=TCP Optimiser
-version=2.6
-versionCode=18
+version=2.7
+versionCode=19
 author=fatalcoder524
 description=TCP Optimisations with dynamic BBRv3/BBR/Cubic selection based on interface
 updateJson=https://raw.githubusercontent.com/Bouteillepleine/TCP_Optimiser_Module/main/update.json
