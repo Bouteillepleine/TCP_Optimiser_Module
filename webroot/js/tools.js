@@ -643,6 +643,8 @@ async function runAuto(btn) {
   const pfx = iftype === 'wifi' ? 'wlan' : 'rmnet';
 
   const results = [];
+  const list = el('div', 'auto-list');
+  out.appendChild(list);
   try {
     let n = 0;
     for (const combo of AUTO_COMBOS) {
@@ -650,7 +652,11 @@ async function runAuto(btn) {
       const cc = await pickCc(combo.cc);
       const q = combo.qdisc;
       if (results.some(r => r.cc === cc && r.qdisc === q)) continue;   // dedupe
-      statusTxt.textContent = `Testing ${cc} / ${q}…  (${n}/${AUTO_COMBOS.length})`;
+      statusTxt.textContent = `Testing ${cc} / ${q}…  (${n}/${AUTO_COMBOS.length}, ~15 s each)`;
+      // Add this combo's row up-front (before the blocking test) so the user sees
+      // which combo is running; it's filled in once the measurement returns.
+      const liveRow = row(`${cc}/${q}`, '⏳ running…');
+      list.appendChild(liveRow);
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       await new Promise(r => setTimeout(r, 30));
 
@@ -658,23 +664,32 @@ async function runAuto(btn) {
       await new Promise(r => setTimeout(r, 2000));                     // settle
       const { stdout } = await exec(bloatScript());
       const m = stdout.match(/RESULT idle=(\S*) loaded=(\S*) sumbps=(\S*) okstreams=(\S*)/);
-      if (!m) { results.push({ cc, qdisc: q, ok: false }); continue; }
-      const idle = parseFloat(m[1]), loaded = parseFloat(m[2]), sumbps = parseFloat(m[3]);
-      const okn = parseInt(m[4], 10) || 0;
-      const mbps = isNaN(sumbps) ? 0 : (sumbps * 8 / 1e6);
-      const inc = Math.max(0, loaded - idle);
-      const loadWorked = okn >= 1 && mbps >= SAT_FLOOR_MBPS && !isNaN(idle) && !isNaN(loaded);
-      results.push({ cc, qdisc: q, ok: loadWorked, mbps, idle, inc,
-                     score: loadWorked ? autoScore(mbps, inc) : -1 });
+      let rec;
+      if (!m) {
+        rec = { cc, qdisc: q, ok: false };
+      } else {
+        const idle = parseFloat(m[1]), loaded = parseFloat(m[2]), sumbps = parseFloat(m[3]);
+        const okn = parseInt(m[4], 10) || 0;
+        const mbps = isNaN(sumbps) ? 0 : (sumbps * 8 / 1e6);
+        const inc = Math.max(0, loaded - idle);
+        const loadWorked = okn >= 1 && mbps >= SAT_FLOOR_MBPS && !isNaN(idle) && !isNaN(loaded);
+        rec = { cc, qdisc: q, ok: loadWorked, mbps, idle, inc, score: loadWorked ? autoScore(mbps, inc) : -1 };
+      }
+      results.push(rec);
+      const v = liveRow.querySelector('.v');
+      if (v) v.textContent = rec.ok ? `${rec.mbps.toFixed(0)} Mbps, +${rec.inc.toFixed(0)} ms` : 'inconclusive';
+      liveRow._rec = rec;
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise(r => setTimeout(r, 30));
     }
 
     const valid = results.filter(r => r.ok).sort((a, b) => b.score - a.score);
-    clearNode(out);
+    status.remove();
 
     if (valid.length === 0) {
       if (origCc) await exec(`echo ${origCc} > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null`);
       await exec(`touch ${md}/force_apply && chmod 644 ${md}/force_apply`);
-      out.appendChild(row('Inconclusive — link never saturated.', ''));
+      out.insertBefore(row('Inconclusive — link never saturated.', ''), list);
       out.appendChild(note('Check signal / data and retry. Your previous setting was restored.'));
       return;
     }
@@ -698,19 +713,17 @@ async function runAuto(btn) {
     else                   { router_state.settingsPageParams.rmnetAlgo = win.cc; router_state.settingsPageParams.rmnetQdisc = win.qdisc; }
     router_state.activeProfile = { name: 'Auto', cc: win.cc, qdisc: win.qdisc };
 
-    const gw = el('div', 'grade-wrap');
-    gw.appendChild(el('div', 'grade grade-' + grade(win.inc), grade(win.inc)));
-    out.appendChild(gw);
-    out.appendChild(row('Best for ' + netLabel, `${win.cc} / ${win.qdisc}`));
-    out.appendChild(row('Download', win.mbps.toFixed(1) + ' Mbps'));
-    out.appendChild(row('Bufferbloat', '+' + win.inc.toFixed(1) + ' ms'));
-    const rk = el('div', 'row'); rk.style.marginTop = '8px';
-    rk.appendChild(el('span', 'k', 'Ranking')); rk.appendChild(el('span', 'v', ''));
-    out.appendChild(rk);
-    for (const r of results) {
-      const val = r.ok ? `${r.mbps.toFixed(0)} Mbps, +${r.inc.toFixed(0)} ms` : 'inconclusive';
-      out.appendChild(row(`${r.cc}/${r.qdisc}${r === win ? '  ★' : ''}`, val));
-    }
+    // winner header above the live ranking; star the winning row in place
+    const head = el('div', 'grade-wrap');
+    head.appendChild(el('div', 'grade grade-' + grade(win.inc), grade(win.inc)));
+    out.insertBefore(head, list);
+    out.insertBefore(row('Best for ' + netLabel, `${win.cc} / ${win.qdisc}`), list);
+    Array.from(list.children).forEach(rowEl => {
+      if (rowEl._rec === win) {
+        const k = rowEl.querySelector('.k');
+        if (k) { k.textContent = '★ ' + k.textContent; k.style.color = 'var(--primary)'; k.style.fontWeight = '700'; }
+      }
+    });
     out.appendChild(note(`Applied to ${netLabel} only. cake was also fed the measured rate. Re-run on each network — the best combo differs per link.`));
     toast(`Auto: ${win.cc}/${win.qdisc} applied to ${netLabel}`);
     addLog(`Auto-optimize ${netLabel}: winner ${win.cc}/${win.qdisc} (${win.mbps.toFixed(1)}Mbps +${win.inc.toFixed(1)}ms)`);
