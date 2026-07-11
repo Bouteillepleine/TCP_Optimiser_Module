@@ -271,10 +271,15 @@ apply_tcp_buffers() {
 		[ -n "$3" ] && [ "$3" -lt "$target" ] && echo "$1 $2 $target" > "$f" 2>/dev/null
 	done
 
+	# tolerate more packet reordering before cutting cwnd (helps on wide /
+	# aggregated Wi-Fi where frames arrive out of order) — raise only, default 300
+	cur=$(cat /proc/sys/net/ipv4/tcp_max_reordering 2>/dev/null)
+	[ -n "$cur" ] && [ "$cur" -lt 1000 ] && echo 1000 > /proc/sys/net/ipv4/tcp_max_reordering 2>/dev/null
+
 	# strict improvements (idempotent): keep cwnd across idle, probe PMTU
 	echo 0 > /proc/sys/net/ipv4/tcp_slow_start_after_idle 2>/dev/null
 	echo 1 > /proc/sys/net/ipv4/tcp_mtu_probing 2>/dev/null
-	log_print "Advanced TCP buffers: raised socket-buffer ceilings to >=16MiB (min/default preserved)"
+	log_print "Advanced TCP buffers: raised socket-buffer ceilings to >=16MiB + tcp_max_reordering>=1000 (min/default preserved)"
 }
 
 apply_wifi_settings() {

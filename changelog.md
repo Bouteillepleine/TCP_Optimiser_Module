@@ -12,7 +12,7 @@ telemetry and a saved test history.
 - Optional **Advanced TCP buffers** toggle — raises the socket-buffer ceilings
   to 16 MiB so BBR/CUBIC can fill high-BDP Wi-Fi 6 / 5G links. Raise-only: it
   never lowers a value, so a ROM that already tunes these (e.g. OxygenOS) is
-  left untouched. Off by default.
+  left untouched. It also raises `tcp_max_reordering` to 1000 (tolerates packet reordering on wide / aggregated Wi-Fi). Off by default.
 
 **Fixes carried from 2.6**
 - Manual congestion control + qdisc apply instantly on Force Apply (Wi-Fi).
