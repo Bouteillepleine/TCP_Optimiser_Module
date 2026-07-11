@@ -1,0 +1,60 @@
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+}
+
+/* hairline divider between visible rows (hidden rows collapse, so the line
+   always lands between the two rows the user actually sees) */
+.system-info .info-row + .info-row {
+  border-top: 1px solid var(--border);
+}
+
+.label {
+  color: var(--text-secondary);
+  font-size: .82rem;
+  letter-spacing: .2px;
+}
+
+.info-row.hidden {
+  display: none;
+}
+
+/* polished header for the taller status card */
+.system-info .card-header {
+  margin-bottom: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* signal strength bars */
+.signal-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+#signal_text {
+  color: var(--text-secondary);
+  font-size: .82rem;
+}
+.bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+.bars i {
+  width: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .16);
+  transition: background .25s ease;
+}
+.bars i:nth-child(1) { height: 6px; }
+.bars i:nth-child(2) { height: 9px; }
+.bars i:nth-child(3) { height: 12px; }
+.bars i:nth-child(4) { height: 16px; }
+.bars.lvl-hi  i.on { background: var(--success, #2ecc82); }
+.bars.lvl-mid i.on { background: var(--warn, #ffb84d); }
+.bars.lvl-low i.on { background: var(--danger, #ff5c6c); }

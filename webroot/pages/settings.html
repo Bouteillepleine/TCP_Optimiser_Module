@@ -1,0 +1,81 @@
+<div class="card settings">
+  <div class="card-header">
+	<h3>Settings</h3>
+  </div>
+  
+  <div class="collapsible-group">
+    <div class="collapsible-header">
+      <h4>TCP Settings</h4>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="collapsible-content">
+	  <div class="setting-group">
+		<div class="setting-row">
+		  <label for="wifi-algo">TCP Congestion Algorithm (Wi-Fi)</label>
+		  <select id="wifi-algo" class="dropdown">
+			<option value="none">Loading Options</option>
+		  </select>
+		</div>
+	  </div>
+
+	  <div class="setting-group">
+		<div class="setting-row">
+		  <label for="wifi-qdisc">QDISC (Wi-Fi)</label>
+		  <select id="wifi-qdisc" class="dropdown">
+			<option value="none">Loading Options</option>
+		  </select>
+		</div>
+	  </div>
+
+	  <div class="setting-group">
+		<div class="setting-row">
+		  <label for="cellular-algo">TCP Congestion Algorithm (Cellular)</label>
+		  <select id="cellular-algo" class="dropdown">
+			<option value="none">Loading Options</option>
+		  </select>
+		</div>
+	  </div>
+
+	  <div class="setting-group">
+		<div class="setting-row">
+		  <label for="cellular-qdisc">QDISC (Cellular)</label>
+		  <select id="cellular-qdisc" class="dropdown">
+			<option value="none">Loading Options</option>
+		  </select>
+		</div>
+	  </div>
+
+	  <div class="setting-group toggle-container">
+		<label id="kill-connections-label" for="kill-connections">Kill Connections on Change</label>
+		<label class="toggle">
+		  <input type="checkbox" id="kill-connections">
+		  <span class="slider"></span>
+		</label>
+	  </div>
+
+	  <div class="setting-group toggle-container">
+		<label id="initcwnd-initrwnd-label" for="initcwnd-initrwnd">Set Max initcwnd & initrwnd</label>
+		<label class="toggle">
+		  <input type="checkbox" id="initcwnd-initrwnd">
+		  <span class="slider"></span>
+		</label>
+	  </div>
+
+	  <div class="setting-group toggle-container">
+		<label id="adv-buffers-label" for="adv-buffers">Advanced TCP buffers (16 MiB, high-BDP)</label>
+		<label class="toggle">
+		  <input type="checkbox" id="adv-buffers">
+		  <span class="slider"></span>
+		</label>
+	  </div>
+	</div>
+  </div>
+  
+	<div class="setting-group toggle-container">
+		<button id="apply" class="apply-btn">Apply</button>
+	</div>
+
+	<div class="setting-group toggle-container">
+		<button id="force-apply" class="apply-btn">Force Apply</button>
+	</div>
+</div>

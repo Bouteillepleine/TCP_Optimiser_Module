@@ -1,0 +1,10 @@
+# The module runs on Linux/Android — force LF so busybox never sees CRLF in .sh
+* text=auto eol=lf
+
+# Binaries: never touch
+bin/** binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.img binary
+*.gz binary

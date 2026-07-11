@@ -1,0 +1,51 @@
+.results-head { justify-content: space-between; }
+.hint { color: var(--text-secondary); font-size: .84rem; margin: -4px 0 14px; }
+
+.clear-btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+  border-radius: 10px; padding: 6px 12px; font-size: .8rem; font-weight: 600; cursor: pointer;
+  transition: transform .15s var(--ease), color .2s, border-color .2s;
+}
+.clear-btn:active { transform: scale(.95); color: var(--danger); border-color: var(--danger); }
+
+.res-card {
+  background: rgba(255,255,255,.03); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px; margin-bottom: 12px;
+}
+.res-card:last-child { margin-bottom: 0; }
+
+.res-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.res-del {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+  font-size: .8rem; line-height: 1; cursor: pointer; padding: 0;
+  transition: transform .15s var(--ease), color .2s, border-color .2s, background .2s;
+}
+.res-del:active { transform: scale(.9); color: var(--danger); border-color: var(--danger); background: rgba(255,92,108,.12); }
+.conn-badge { font-size: .76rem; font-weight: 700; padding: 3px 11px; border-radius: 999px; white-space: nowrap; }
+.conn-wifi  { background: rgba(91,140,255,.18);  color: #7ea6ff; }
+.conn-5g    { background: rgba(46,204,130,.18);  color: #3fd18a; }
+.conn-4g    { background: rgba(255,184,77,.18);   color: #ffb84d; }
+.conn-other { background: rgba(255,255,255,.08);  color: var(--text-secondary); }
+.res-date { color: var(--text-secondary); font-size: .76rem; flex: 1; }
+.res-grade {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 800; font-size: 1rem; color: #0c1013; flex: none;
+}
+.res-grade.grade-A { background: #2ecc82; } .res-grade.grade-B { background: #7ed957; }
+.res-grade.grade-C { background: #ffd24d; } .res-grade.grade-D { background: #ffab4d; }
+.res-grade.grade-F { background: #ff5c6c; }
+
+.res-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; margin-bottom: 12px; }
+.metric .m-val { font-size: 1.45rem; font-weight: 800; color: var(--text); line-height: 1; }
+.metric .m-unit { font-size: .68rem; font-weight: 600; color: var(--text-secondary); }
+.metric .m-label { font-size: .66rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); margin-top: 5px; }
+
+.res-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.res-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-size: .74rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: rgba(139,124,255,.15); color: var(--primary); }
+.chip-dim { background: rgba(255,255,255,.06); color: var(--text-secondary); }
+.chip-profile { background: var(--accent-grad); color: #fff; font-weight: 700; }
+.res-bloat { font-size: .78rem; font-weight: 700; color: var(--text-secondary); }
+
+.results-empty { color: var(--text-secondary); font-size: .9rem; text-align: center; padding: 22px 8px; line-height: 1.6; }

@@ -1,0 +1,7 @@
+# build output
+*.zip
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini

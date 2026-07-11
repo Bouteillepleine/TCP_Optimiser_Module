@@ -1,0 +1,56 @@
+<div class="card">
+  <div class="card-header"><h3>Profiles</h3></div>
+  <p class="hint">One tap sets congestion control + qdisc + tuning for a use-case.</p>
+  <div class="profile-grid">
+    <button class="profile-btn" data-profile="gaming">
+      <span class="p-emoji">🎮</span><span class="p-name">Gaming</span>
+      <span class="p-sub">lowest latency</span>
+    </button>
+    <button class="profile-btn" data-profile="stream">
+      <span class="p-emoji">🎬</span><span class="p-name">Streaming</span>
+      <span class="p-sub">max throughput</span>
+    </button>
+    <button class="profile-btn" data-profile="balanced">
+      <span class="p-emoji">⚖️</span><span class="p-name">Balanced</span>
+      <span class="p-sub">good all-round</span>
+    </button>
+    <button class="profile-btn" data-profile="battery">
+      <span class="p-emoji">🔋</span><span class="p-name">Battery</span>
+      <span class="p-sub">easy on power</span>
+    </button>
+  </div>
+  <div id="profile-result" class="result-box hidden"></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h3>Bufferbloat &amp; Latency Test</h3></div>
+  <p class="hint">Measures ping when idle vs under heavy download, and grades it. Each run is saved to the Results tab.</p>
+  <button id="bloat-run" class="big-btn">Run Test</button>
+  <div id="bloat-out" class="result-box hidden"></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h3>Live BBR Telemetry</h3></div>
+  <p class="hint">Real download throughput (summed TCP byte deltas) and the busiest connection's min RTT, sampled every second — plus the live bbr model below. Uses kernel debugfs when available.</p>
+  <button id="tele-run" class="big-btn">Start</button>
+  <div id="tele-out" class="result-box hidden">
+    <canvas id="tele-canvas" class="tele-canvas" width="640" height="220"></canvas>
+    <div id="tele-legend" class="tele-legend">
+      <span class="tele-key tele-key-bw">— download (Mbps)</span>
+      <span class="tele-key tele-key-rtt">— min RTT (ms)</span>
+    </div>
+    <div id="tele-stats"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h3>CC Duel (A/B)</h3></div>
+  <p class="hint">Times the same single-stream download once per algorithm and compares. Your congestion-control setting is restored afterwards.</p>
+  <div class="ab-row">
+    <select id="ab-cc-a" class="ab-select"></select>
+    <span class="ab-vs">vs</span>
+    <select id="ab-cc-b" class="ab-select"></select>
+  </div>
+  <button id="ab-run" class="big-btn">Run A/B</button>
+  <div id="ab-out" class="result-box hidden"></div>
+</div>

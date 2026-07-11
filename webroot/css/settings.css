@@ -1,0 +1,201 @@
+.setting-group {
+  margin-bottom: 16px;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.setting-row label {
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+#kill-connections-label, #initcwnd-initrwnd-label {
+  color: var(--text-secondary);
+}
+
+.dropdown {
+  width: 190px;
+  max-width: 56%;
+  padding: 10px 38px 10px 14px;
+  background-color: var(--card-bg-2);
+  /* custom chevron (appearance:none removes the native one) */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa2b1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  transition: border-color .2s var(--ease), background-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+
+.dropdown:hover {
+  border-color: rgba(139,124,255,0.5);
+  background-color: var(--card-bg);
+}
+
+.dropdown:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(139,124,255,0.18);
+}
+
+/* ---- custom dropdown (replaces the native <select> popup) ---- */
+.cselect { position: relative; width: 190px; max-width: 56%; }
+.cselect-native { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cselect-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 10px 14px; cursor: pointer;
+  background: var(--card-bg-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 0.9rem; font-weight: 600;
+  transition: border-color .2s var(--ease), background-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.cselect-trigger:hover { border-color: rgba(139,124,255,0.5); background: var(--card-bg); }
+.cselect.open .cselect-trigger { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(139,124,255,0.18); }
+.cselect-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cselect-chev {
+  width: 9px; height: 9px; flex: none; margin-right: 3px;
+  border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary);
+  transform: rotate(45deg) translate(-2px, -2px); transition: transform .2s var(--ease);
+}
+.cselect.open .cselect-chev { transform: rotate(-135deg) translate(-2px, -1px); }
+.cselect-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
+  background: var(--card-bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  padding: 6px; max-height: 244px; overflow-y: auto;
+  opacity: 0; transform: translateY(-6px); pointer-events: none;
+  transition: opacity .18s var(--ease), transform .18s var(--ease);
+}
+.cselect.open .cselect-menu { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.cselect-option {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; border-radius: 8px; cursor: pointer;
+  font-size: 0.9rem; color: var(--text);
+}
+.cselect-option:hover { background: rgba(139,124,255,0.14); }
+.cselect-option.selected { color: var(--primary); font-weight: 700; }
+.cselect-option.selected::after { content: "\2713"; font-size: 0.85rem; margin-left: 10px; }
+
+.dropdown option {
+  background-color: var(--card-bg-2);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.toggle-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #2d2d2d;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--text);
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+.apply-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--primary);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.apply-btn:hover {
+  opacity: 0.9;
+}
+
+.collapsible-group {
+  margin-bottom: 16px;
+}
+
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 8px 0;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.collapsible-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.collapsible-header .arrow {
+  transition: transform 0.3s ease;
+}
+
+.collapsible-header.active .arrow {
+  transform: rotate(180deg);
+}
+
+.collapsible-content {
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  max-height: 200px; /* Adjust based on expected content height */
+  margin: 12px 0;
+}
+
+.collapsible-content.collapsed {
+  max-height: 0;
+}
