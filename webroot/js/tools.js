@@ -588,10 +588,7 @@ async function autoCcSet() {
   try {
     const { stdout } = await exec('cat /proc/sys/net/ipv4/tcp_available_congestion_control');
     const have = stdout.trim().split(/\s+/);
-    const set = [];
-    const bbr = ['bbr3', 'bbr'].find(a => have.includes(a));
-    if (bbr) set.push(bbr);
-    if (have.includes('cubic')) set.push('cubic');
+    const set = ['bbr3', 'bbr', 'cubic'].filter(a => have.includes(a));
     return set.length ? set : [have[0] || 'cubic'];
   } catch { return ['cubic']; }
 }
