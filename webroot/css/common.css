@@ -112,6 +112,7 @@ body {
 }
 .nav-item.active { color: var(--primary); background: rgba(139,124,255,.14); }
 .nav-icon {
+  display: block; flex: none;
   width: 24px; height: 24px; margin-bottom: 3px;
   /* soft emboss body: light top-left -> dark bottom-right, filled through the SVG mask */
   background: linear-gradient(155deg, #eef0f6 0%, #c2c4d0 48%, #83879a 100%);
