@@ -136,23 +136,23 @@ async function stopLoad() {
 // so throughput is summed straight from each stream's curl report. Streams are
 // spread STREAMS_PER across each mirror in LOAD_URLS to reach the real link
 // ceiling. (JS interpolates ${urlList}/${STREAMS_PER}; shell keeps $VAR only.)
-function bloatScript() {
+function bloatScript(streamsPer = STREAMS_PER, maxTime = 12, idleN = 10, loadN = 15) {
   const urlList = LOAD_URLS.map(u => `"${u}"`).join(' ');
   return `
-IDLE=$(ping -c 10 -i 0.3 -W 2 1.1.1.1 2>/dev/null | awk -F'/' 'END{print $5}')
+IDLE=$(ping -c ${idleN} -i 0.3 -W 2 1.1.1.1 2>/dev/null | awk -F'/' 'END{print $5}')
 D=/data/local/tmp/.bloat_res
 rm -rf "$D"; mkdir -p "$D"
 i=0
 for URL in ${urlList}; do
   s=1
-  while [ "$s" -le ${STREAMS_PER} ]; do
+  while [ "$s" -le ${streamsPer} ]; do
     i=$((i+1))
-    ( curl -s -o /dev/null -w '%{speed_download} %{http_code}\\n' --max-time 12 "$URL" > "$D/$i" 2>/dev/null ) &
+    ( curl -s -o /dev/null -w '%{speed_download} %{http_code}\\n' --max-time ${maxTime} "$URL" > "$D/$i" 2>/dev/null ) &
     s=$((s+1))
   done
 done
 sleep 2
-LOADED=$(ping -c 15 -i 0.3 -W 2 1.1.1.1 2>/dev/null | awk -F'/' 'END{print $5}')
+LOADED=$(ping -c ${loadN} -i 0.3 -W 2 1.1.1.1 2>/dev/null | awk -F'/' 'END{print $5}')
 wait
 STATS=$(awk '{s+=$1} ($2==200||$2==206){c++} END{printf "%.0f %d", s, c+0}' "$D"/* 2>/dev/null)
 set -- $STATS
@@ -578,11 +578,23 @@ async function abPopulate() {
 // A few (cc, qdisc) combos are probed on the CURRENT connection; the one with the
 // best throughput-vs-bufferbloat wins and is applied + persisted. cc is resolved
 // against the kernel's available algorithms.
-const AUTO_COMBOS = [
-  { cc: ['bbr3', 'bbr', 'cubic'], qdisc: 'cake' },
-  { cc: ['bbr3', 'bbr', 'cubic'], qdisc: 'fq_codel' },
-  { cc: ['cubic'],                qdisc: 'cake' },
-];
+// The meaningful search space: each distinct congestion control (best BBR + CUBIC)
+// crossed with each fair/AQM qdisc. FIFO qdiscs (pfifo/bfifo/pfifo_fast) and the
+// classful wrappers are skipped — no AQM, so they can only worsen bufferbloat —
+// and reno is strictly weaker than cubic/bbr; probing them all would add ~10 min
+// of downloads for combos that cannot win.
+const AUTO_QDISCS = ['cake', 'fq_codel', 'fq'];
+async function autoCcSet() {
+  try {
+    const { stdout } = await exec('cat /proc/sys/net/ipv4/tcp_available_congestion_control');
+    const have = stdout.trim().split(/\s+/);
+    const set = [];
+    const bbr = ['bbr3', 'bbr'].find(a => have.includes(a));
+    if (bbr) set.push(bbr);
+    if (have.includes('cubic')) set.push('cubic');
+    return set.length ? set : [have[0] || 'cubic'];
+  } catch { return ['cubic']; }
+}
 // qdisc args mirror set_qdisc() so the probe reflects what will actually apply.
 function autoQdiscArgs(q) {
   if (q === 'cake')     return 'cake besteffort triple-isolate wash ack-filter';
@@ -642,17 +654,19 @@ async function runAuto(btn) {
   const netLabel = iftype === 'wifi' ? 'Wi-Fi' : 'Cellular';
   const pfx = iftype === 'wifi' ? 'wlan' : 'rmnet';
 
+  const ccSet = await autoCcSet();
+  const combos = [];
+  for (const cc of ccSet) for (const q of AUTO_QDISCS) combos.push({ cc, q });
+
   const results = [];
   const list = el('div', 'auto-list');
   out.appendChild(list);
   try {
     let n = 0;
-    for (const combo of AUTO_COMBOS) {
+    for (const combo of combos) {
       n++;
-      const cc = await pickCc(combo.cc);
-      const q = combo.qdisc;
-      if (results.some(r => r.cc === cc && r.qdisc === q)) continue;   // dedupe
-      statusTxt.textContent = `Testing ${cc} / ${q}…  (${n}/${AUTO_COMBOS.length}, ~15 s each)`;
+      const cc = combo.cc, q = combo.q;
+      statusTxt.textContent = `Testing ${cc} / ${q}…  (${n}/${combos.length}, ~10 s each)`;
       // Add this combo's row up-front (before the blocking test) so the user sees
       // which combo is running; it's filled in once the measurement returns.
       const liveRow = row(`${cc}/${q}`, '⏳ running…');
@@ -662,7 +676,7 @@ async function runAuto(btn) {
 
       await exec(autoApplyScript(cc, autoQdiscArgs(q), tcBin));
       await new Promise(r => setTimeout(r, 2000));                     // settle
-      const { stdout } = await exec(bloatScript());
+      const { stdout } = await exec(bloatScript(2, 8, 6, 8));          // lighter probe (data/time)
       const m = stdout.match(/RESULT idle=(\S*) loaded=(\S*) sumbps=(\S*) okstreams=(\S*)/);
       let rec;
       if (!m) {
