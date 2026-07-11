@@ -14,7 +14,7 @@
   flex: 1;
 }
 
-#kill-connections-label, #initcwnd-initrwnd-label {
+#kill-connections-label, #initcwnd-initrwnd-label, #adv-buffers-label {
   color: var(--text-secondary);
 }
 
