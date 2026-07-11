@@ -224,6 +224,15 @@ async function runBloat(btn) {
     // Record the run (with the settings it ran under) for the Results tab.
     try {
       const ctx = await getBenchContext();
+      // Feed the measured link rate + idle RTT to "smart cake": set_qdisc reads
+      // cake_hint_<wlan|rmnet> and shapes cake to it (bandwidth+rtt) on next apply.
+      if (loadWorked && (ctx.iftype === 'wifi' || ctx.iftype === 'cell')) {
+        const md = router_state.moduleInformation.moduleDir;
+        const pfx = ctx.iftype === 'wifi' ? 'wlan' : 'rmnet';
+        const bwHint = Math.max(2, Math.round(mbps));
+        const rttHint = Math.max(5, Math.round(idle));
+        await exec(`echo "${bwHint} ${rttHint}" > ${md}/cake_hint_${pfx} && chmod 644 ${md}/cake_hint_${pfx}`);
+      }
       // Tag with the applied profile only while it's still the active one. Matched
       // on cc alone (live qdisc reads are unreliable — htb-wrapping/timing); a
       // manual Settings apply clears activeProfile so the tag drops immediately.
@@ -565,10 +574,162 @@ async function abPopulate() {
   } catch (e) { console.error('ab populate', e); }
 }
 
+/* ---------- auto-optimize ---------- */
+// A few (cc, qdisc) combos are probed on the CURRENT connection; the one with the
+// best throughput-vs-bufferbloat wins and is applied + persisted. cc is resolved
+// against the kernel's available algorithms.
+const AUTO_COMBOS = [
+  { cc: ['bbr3', 'bbr', 'cubic'], qdisc: 'cake' },
+  { cc: ['bbr3', 'bbr', 'cubic'], qdisc: 'fq_codel' },
+  { cc: ['cubic'],                qdisc: 'cake' },
+];
+// qdisc args mirror set_qdisc() so the probe reflects what will actually apply.
+function autoQdiscArgs(q) {
+  if (q === 'cake')     return 'cake besteffort triple-isolate wash ack-filter';
+  if (q === 'fq_codel') return 'fq_codel limit 1024 target 5ms interval 100ms ecn';
+  if (q === 'fq')       return 'fq pacing limit 2000 flow_limit 40 buckets 1024 initial_quantum 15000';
+  return q;
+}
+// Apply a cc (global + per-route congctl, like the duel) and a root qdisc, live.
+function autoApplyScript(cc, qdiscArgs, tcBin) {
+  return `
+IF=$(ip route get 192.0.2.1 2>/dev/null | grep -o 'dev [^ ]*' | awk '{print $2}')
+echo "${cc}" > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null
+if [ -n "$IF" ]; then
+  ip route show table "$IF" 2>/dev/null | while IFS= read -r r; do
+    [ -z "$r" ] && continue
+    case "$r" in unreachable*|throw*|blackhole*|prohibit*) continue ;; esac
+    base=$(echo "$r" | sed 's/ congctl [^ ]*//')
+    ip route change $base table "$IF" congctl "${cc}" 2>/dev/null
+  done
+  ${tcBin} qdisc replace dev "$IF" root ${qdiscArgs} 2>/dev/null
+fi
+echo "APPLIED cc=${cc} if=$IF"
+`;
+}
+// throughput weighted down by bufferbloat (ms): inc=0 -> mbps, inc=100 -> mbps/2.
+function autoScore(mbps, inc) { return mbps * 100 / (100 + inc); }
+
+async function runAuto(btn) {
+  const out = document.getElementById('auto-out');
+  const md = router_state.moduleInformation.moduleDir;
+  const tcBin = `${md}/bin/tc`;
+
+  const btnLabel = btn.textContent;
+  btn.classList.add('busy');
+  clearNode(btn); btn.appendChild(spinner()); btn.appendChild(el('span', null, 'Optimizing…'));
+  out.classList.remove('hidden'); clearNode(out);
+  const status = el('div', 'run-status');
+  status.appendChild(spinner());
+  const statusTxt = el('span', null, 'Preparing…');
+  status.appendChild(statusTxt);
+  out.appendChild(status);
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise(r => setTimeout(r, 30));
+
+  let iftype = 'none', origCc = '';
+  try {
+    const { stdout: ifRaw } = await exec(`ip route get 192.0.2.1 2>/dev/null | awk '/dev/ {for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}'`);
+    const ifn = ifRaw.trim();
+    iftype = /^wlan|^tun/.test(ifn) ? 'wifi' : (/rmnet|ccmni/.test(ifn) ? 'cell' : 'none');
+    const { stdout: cc0 } = await exec('cat /proc/sys/net/ipv4/tcp_congestion_control');
+    origCc = cc0.trim();
+  } catch {}
+  if (iftype === 'none') {
+    clearNode(out); out.appendChild(row('No active Wi-Fi / Cellular connection.', ''));
+    btn.classList.remove('busy'); clearNode(btn); btn.textContent = btnLabel; return;
+  }
+  const netLabel = iftype === 'wifi' ? 'Wi-Fi' : 'Cellular';
+  const pfx = iftype === 'wifi' ? 'wlan' : 'rmnet';
+
+  const results = [];
+  try {
+    let n = 0;
+    for (const combo of AUTO_COMBOS) {
+      n++;
+      const cc = await pickCc(combo.cc);
+      const q = combo.qdisc;
+      if (results.some(r => r.cc === cc && r.qdisc === q)) continue;   // dedupe
+      statusTxt.textContent = `Testing ${cc} / ${q}…  (${n}/${AUTO_COMBOS.length})`;
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise(r => setTimeout(r, 30));
+
+      await exec(autoApplyScript(cc, autoQdiscArgs(q), tcBin));
+      await new Promise(r => setTimeout(r, 2000));                     // settle
+      const { stdout } = await exec(bloatScript());
+      const m = stdout.match(/RESULT idle=(\S*) loaded=(\S*) sumbps=(\S*) okstreams=(\S*)/);
+      if (!m) { results.push({ cc, qdisc: q, ok: false }); continue; }
+      const idle = parseFloat(m[1]), loaded = parseFloat(m[2]), sumbps = parseFloat(m[3]);
+      const okn = parseInt(m[4], 10) || 0;
+      const mbps = isNaN(sumbps) ? 0 : (sumbps * 8 / 1e6);
+      const inc = Math.max(0, loaded - idle);
+      const loadWorked = okn >= 1 && mbps >= SAT_FLOOR_MBPS && !isNaN(idle) && !isNaN(loaded);
+      results.push({ cc, qdisc: q, ok: loadWorked, mbps, idle, inc,
+                     score: loadWorked ? autoScore(mbps, inc) : -1 });
+    }
+
+    const valid = results.filter(r => r.ok).sort((a, b) => b.score - a.score);
+    clearNode(out);
+
+    if (valid.length === 0) {
+      if (origCc) await exec(`echo ${origCc} > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null`);
+      await exec(`touch ${md}/force_apply && chmod 644 ${md}/force_apply`);
+      out.appendChild(row('Inconclusive — link never saturated.', ''));
+      out.appendChild(note('Check signal / data and retry. Your previous setting was restored.'));
+      return;
+    }
+
+    const win = valid[0];
+    const bwHint = Math.max(2, Math.round(win.mbps));
+    const rttHint = Math.max(5, Math.round(win.idle));
+
+    if (iftype === 'wifi') await exec(`rm -f ${md}/wlan_*`);
+    else                   await exec(`rm -f ${md}/rmnet_data_*`);
+    const marker = iftype === 'wifi' ? `wlan_${win.cc}_${win.qdisc}` : `rmnet_data_${win.cc}_${win.qdisc}`;
+    await exec(`touch ${md}/${marker} && chmod 644 ${md}/${marker}`);
+    let winQArgs = autoQdiscArgs(win.qdisc);
+    if (win.qdisc === 'cake') {
+      await exec(`echo "${bwHint} ${rttHint}" > ${md}/cake_hint_${pfx} && chmod 644 ${md}/cake_hint_${pfx}`);
+      winQArgs = `cake bandwidth ${bwHint}mbit rtt ${rttHint}ms besteffort triple-isolate wash ack-filter`;
+    }
+    await exec(autoApplyScript(win.cc, winQArgs, tcBin));               // live now
+    await exec(`touch ${md}/force_apply && chmod 644 ${md}/force_apply`); // daemon re-asserts + watchdog
+    if (iftype === 'wifi') { router_state.settingsPageParams.wlanAlgo = win.cc; router_state.settingsPageParams.wlanQdisc = win.qdisc; }
+    else                   { router_state.settingsPageParams.rmnetAlgo = win.cc; router_state.settingsPageParams.rmnetQdisc = win.qdisc; }
+    router_state.activeProfile = { name: 'Auto', cc: win.cc, qdisc: win.qdisc };
+
+    const gw = el('div', 'grade-wrap');
+    gw.appendChild(el('div', 'grade grade-' + grade(win.inc), grade(win.inc)));
+    out.appendChild(gw);
+    out.appendChild(row('Best for ' + netLabel, `${win.cc} / ${win.qdisc}`));
+    out.appendChild(row('Download', win.mbps.toFixed(1) + ' Mbps'));
+    out.appendChild(row('Bufferbloat', '+' + win.inc.toFixed(1) + ' ms'));
+    const rk = el('div', 'row'); rk.style.marginTop = '8px';
+    rk.appendChild(el('span', 'k', 'Ranking')); rk.appendChild(el('span', 'v', ''));
+    out.appendChild(rk);
+    for (const r of results) {
+      const val = r.ok ? `${r.mbps.toFixed(0)} Mbps, +${r.inc.toFixed(0)} ms` : 'inconclusive';
+      out.appendChild(row(`${r.cc}/${r.qdisc}${r === win ? '  ★' : ''}`, val));
+    }
+    out.appendChild(note(`Applied to ${netLabel} only. cake was also fed the measured rate. Re-run on each network — the best combo differs per link.`));
+    toast(`Auto: ${win.cc}/${win.qdisc} applied to ${netLabel}`);
+    addLog(`Auto-optimize ${netLabel}: winner ${win.cc}/${win.qdisc} (${win.mbps.toFixed(1)}Mbps +${win.inc.toFixed(1)}ms)`);
+  } catch (e) {
+    console.error(e);
+    clearNode(out); out.appendChild(row('Auto-optimize error.', ''));
+    if (origCc) await exec(`echo ${origCc} > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null`);
+    await stopLoad();
+  } finally {
+    btn.classList.remove('busy'); clearNode(btn); btn.textContent = btnLabel;
+  }
+}
+
 export function initTools() {
   document.querySelectorAll('.profile-btn').forEach(btn => {
     btn.addEventListener('click', () => applyProfile(btn.dataset.profile, btn));
   });
+  const au = document.getElementById('auto-run');
+  if (au) au.addEventListener('click', () => runAuto(au));
   const b = document.getElementById('bloat-run');
   if (b) b.addEventListener('click', () => runBloat(b));
   const t = document.getElementById('tele-run');

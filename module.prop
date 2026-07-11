@@ -1,7 +1,7 @@
 id=tcp_optimiser
 name=TCP Optimiser 
 version=2.7
-versionCode=44
+versionCode=45
 author=fatalcoder524
 description=Per-interface TCP congestion control + qdisc tuning, with a WebUI (Profiles, bufferbloat test, live BBR telemetry, CC A/B duel, Results tab, per-route congctl pinning).
 updateJson=https://github.com/fatalcoder524/TCP_Optimiser_Module/releases/latest/download/update.json

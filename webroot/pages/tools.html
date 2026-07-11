@@ -23,6 +23,13 @@
 </div>
 
 <div class="card">
+  <div class="card-header"><h3>Auto-Optimize</h3></div>
+  <p class="hint">Tests a few congestion-control + qdisc combos on <b>this</b> connection and applies the one with the best throughput-vs-bufferbloat. ~1 min, uses data (Wi-Fi recommended).</p>
+  <button id="auto-run" class="big-btn">Find &amp; Apply Best</button>
+  <div id="auto-out" class="result-box hidden"></div>
+</div>
+
+<div class="card">
   <div class="card-header"><h3>Bufferbloat &amp; Latency Test</h3></div>
   <p class="hint">Measures ping when idle vs under heavy download, and grades it. Each run is saved to the Results tab.</p>
   <button id="bloat-run" class="big-btn">Run Test</button>

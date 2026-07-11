@@ -90,6 +90,7 @@ set_qdisc() {
 
 	local qdisc_args="$qdisc"
 	local handle_flag=""
+	local cake_hint="" cake_bw="" cake_rtt="" chbw="" chrtt=""
 
 	case "$qdisc" in
         fq)          		qdisc_args="fq pacing limit 2000 flow_limit 40 buckets 1024 initial_quantum 15000" ;;
@@ -103,7 +104,19 @@ set_qdisc() {
         pfifo_head_drop) 	qdisc_args="pfifo_head_drop limit 2000" ;;
         bfifo)       		qdisc_args="bfifo limit 3145728" ;;
         pfifo_fast)  		qdisc_args="pfifo_fast" ;;
-        cake)        		qdisc_args="cake besteffort triple-isolate wash" ;;
+        cake)
+            # "Smart cake": if a bufferbloat test left a measured rate/RTT for this
+            # link, shape to it (engages the shaper + ack-filter) instead of running
+            # cake unlimited. Hint file "cake_hint_<wlan|rmnet>" holds "<mbit> <ms>".
+            cake_hint="$MODPATH/cake_hint_wlan"
+            case "$iface" in *rmnet*|*ccmni*) cake_hint="$MODPATH/cake_hint_rmnet" ;; esac
+            if [ -f "$cake_hint" ]; then
+                read chbw chrtt _ < "$cake_hint"
+                [ -n "$chbw" ] && [ "$chbw" -gt 0 ] 2>/dev/null && cake_bw="bandwidth ${chbw}mbit"
+                [ -n "$chrtt" ] && [ "$chrtt" -gt 0 ] 2>/dev/null && cake_rtt="rtt ${chrtt}ms"
+            fi
+            qdisc_args="cake $cake_bw $cake_rtt besteffort triple-isolate wash ack-filter"
+            ;;
         pie)         		qdisc_args="pie target 15ms tupdate 15ms alpha 2 beta 20 ecn" ;;
 		fq_pie)      		qdisc_args="fq_pie limit 2000 target 15ms tupdate 15ms alpha 2 beta 20 ecn" ;;
 		*) 					qdisc_args="$qdisc" ;;

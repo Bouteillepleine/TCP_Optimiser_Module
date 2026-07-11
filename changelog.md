@@ -9,6 +9,11 @@ telemetry and a saved test history.
 - Live **BBR telemetry** on Home.
 - **Congestion-control A/B duel** — compare two algorithms head to head.
 - **Per-route congestion-control pinning**.
+- **Auto-Optimize** (Tools): probes a few congestion-control + qdisc combos on the
+  current connection and applies the best throughput-vs-bufferbloat.
+- **Smart cake**: after a bufferbloat test, the cake qdisc is shaped to the
+  measured rate + RTT (`bandwidth`/`rtt`/`ack-filter`) instead of running
+  unlimited.
 - Optional **Advanced TCP buffers** toggle — raises the socket-buffer ceilings
   to 16 MiB so BBR/CUBIC can fill high-BDP Wi-Fi 6 / 5G links. Raise-only: it
   never lowers a value, so a ROM that already tunes these (e.g. OxygenOS) is
