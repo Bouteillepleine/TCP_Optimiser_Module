@@ -111,8 +111,22 @@ body {
   border-radius: 14px; transition: color .25s var(--ease), background .25s var(--ease);
 }
 .nav-item.active { color: var(--primary); background: rgba(139,124,255,.14); }
-.nav-icon { width: 22px; height: 22px; margin-bottom: 3px; transition: transform .25s var(--ease); }
-.nav-item.active .nav-icon { transform: translateY(-1px) scale(1.08); }
+.nav-icon {
+  width: 24px; height: 24px; margin-bottom: 3px;
+  /* soft emboss body: light top-left -> dark bottom-right, filled through the SVG mask */
+  background: linear-gradient(155deg, #eef0f6 0%, #c2c4d0 48%, #83879a 100%);
+  -webkit-mask: var(--icon) center / 22px 22px no-repeat;
+          mask: var(--icon) center / 22px 22px no-repeat;
+  /* bevel: bright top edge + dark bottom edge for a raised, relief feel */
+  filter: drop-shadow(0 -0.5px 0 rgba(255,255,255,.4)) drop-shadow(0 1px 1.2px rgba(0,0,0,.55));
+  transition: transform .25s var(--ease), filter .25s var(--ease), background .25s var(--ease);
+}
+.nav-item.active .nav-icon {
+  /* active: purple relief that lights up */
+  background: linear-gradient(155deg, #d6d0ff 0%, #8b7cff 52%, #574ad0 100%);
+  filter: drop-shadow(0 -0.5px 0 rgba(255,255,255,.5)) drop-shadow(0 0 7px rgba(139,124,255,.85));
+  transform: translateY(-1px) scale(1.12);
+}
 .nav-text { font-size: .74rem; font-weight: 600; }
 
 /* page transitions */
