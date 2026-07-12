@@ -19,9 +19,13 @@ update_description() {
 	case "$iface" in
 		Wi-Fi) icon="🛜" ;;
 		Cellular) icon="📶" ;;
+		none) icon="✈️" ;;
 	esac
 
-	local desc="TCP Optimisations \& update tcp_cong_algo based on interface \| iface\: $iface $icon \| algo\: $CURRENT_ALGO \| qdisc\: $CURRENT_QDISC"
+	# live status shown on the module card in the KernelSU / SukiSU manager
+	local extra=""
+	[ -f "$MODPATH/adv_buffers" ] && extra="$extra \| +16M buffers"
+	local desc="Per-interface TCP tuning \| $iface $icon \| cc\: $CURRENT_ALGO \| qdisc\: $CURRENT_QDISC$extra"
 	sed -i -e "s/^description=.*/description=$desc/" "$MODPATH/module.prop"
 }
 
