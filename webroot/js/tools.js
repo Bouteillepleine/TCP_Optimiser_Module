@@ -78,6 +78,7 @@ async function applyProfile(key, btn) {
 
     await exec(`echo ${cc} > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null`);
     for (const sc of P.sysctl) await exec(`sysctl -w ${sc} 2>/dev/null`);
+    await exec(`echo "${P.name}" > ${md}/active_profile && chmod 644 ${md}/active_profile`);
     await exec(`touch ${md}/force_apply && chmod 644 ${md}/force_apply`);
 
     document.querySelectorAll('.profile-btn').forEach(b => b.classList.remove('active-profile'));
@@ -719,6 +720,7 @@ async function runAuto(btn) {
       winQArgs = `cake bandwidth ${bwHint}mbit rtt ${rttHint}ms besteffort triple-isolate wash ack-filter`;
     }
     await exec(autoApplyScript(win.cc, winQArgs, tcBin));               // live now
+    await exec(`echo "Auto" > ${md}/active_profile && chmod 644 ${md}/active_profile`);
     await exec(`touch ${md}/force_apply && chmod 644 ${md}/force_apply`); // daemon re-asserts + watchdog
     if (iftype === 'wifi') { router_state.settingsPageParams.wlanAlgo = win.cc; router_state.settingsPageParams.wlanQdisc = win.qdisc; }
     else                   { router_state.settingsPageParams.rmnetAlgo = win.cc; router_state.settingsPageParams.rmnetQdisc = win.qdisc; }

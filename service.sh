@@ -24,9 +24,18 @@ update_description() {
 
 	# live status shown on the module card in the KernelSU / SukiSU manager
 	local extra=""
-	[ -f "$MODPATH/adv_buffers" ] && extra="$extra \| +16M buffers"
-	local desc="Per-interface TCP tuning \| $iface $icon \| cc\: $CURRENT_ALGO \| qdisc\: $CURRENT_QDISC$extra"
-	sed -i -e "s/^description=.*/description=$desc/" "$MODPATH/module.prop"
+	if [ "$iface" = "Wi-Fi" ]; then
+		local wi=$(dumpsys wifi 2>/dev/null | grep -m1 'mWifiInfo SSID')
+		local spd=$(echo "$wi" | sed -n 's/.*Max Supported Tx Link speed: \([0-9]*\)Mbps.*/\1/p')
+		local rssi=$(echo "$wi" | sed -n 's/.*RSSI: \(-*[0-9][0-9]*\).*/\1/p')
+		[ -n "$spd" ] && extra="$extra · ${spd} Mbps"
+		[ -n "$rssi" ] && extra="$extra · ${rssi} dBm"
+	fi
+	[ -f "$MODPATH/active_profile" ] && extra="$extra · $(cat "$MODPATH/active_profile")"
+	[ -f "$MODPATH/adv_buffers" ] && extra="$extra · +16M"
+	# sed uses | as delimiter so the cc/qdisc slash is safe; keep no | in $desc
+	local desc="TCP tuning · $iface $icon · $CURRENT_ALGO/$CURRENT_QDISC$extra"
+	sed -i -e "s|^description=.*|description=$desc|" "$MODPATH/module.prop"
 }
 
 kill_tcp_connections() {

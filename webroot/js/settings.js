@@ -316,6 +316,7 @@ export async function initSettings() {
 			await exec(`rm -f ${router_state.moduleInformation.moduleDir}/kill_connections`);
 			await exec(`rm -f ${router_state.moduleInformation.moduleDir}/initcwnd_initrwnd`);
 			await exec(`rm -f ${router_state.moduleInformation.moduleDir}/adv_buffers`);
+			await exec(`rm -f ${router_state.moduleInformation.moduleDir}/active_profile`);
 			
 			await exec(`touch ${router_state.moduleInformation.moduleDir}/wlan_${settings.wifiAlgorithm}_${settings.wifiQdisc} && chmod 644 ${router_state.moduleInformation.moduleDir}/wlan_${settings.wifiAlgorithm}_${settings.wifiQdisc}`);
 			await exec(`touch ${router_state.moduleInformation.moduleDir}/rmnet_data_${settings.cellularAlgorithm}_${settings.cellularQdisc} && chmod 644 ${router_state.moduleInformation.moduleDir}/rmnet_data_${settings.cellularAlgorithm}_${settings.cellularQdisc}`);
