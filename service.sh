@@ -14,12 +14,12 @@ CURRENT_QDISC=""
 
 update_description() {
 	local iface="$1"
-	local icon="⁉️"
+	local icon="⁉️" label="$iface"
 
 	case "$iface" in
 		Wi-Fi) icon="🛜" ;;
 		Cellular) icon="📶" ;;
-		none) icon="✈️" ;;
+		none) icon="✈️"; label="Offline" ;;
 	esac
 
 	# live status shown on the module card in the KernelSU / SukiSU manager
@@ -30,11 +30,23 @@ update_description() {
 		local rssi=$(echo "$wi" | sed -n 's/.*RSSI: \(-*[0-9][0-9]*\).*/\1/p')
 		[ -n "$spd" ] && extra="$extra · ${spd} Mbps"
 		[ -n "$rssi" ] && extra="$extra · ${rssi} dBm"
+	elif [ "$iface" = "Cellular" ]; then
+		# active-data SIM signal + RAT, same logic as the WebUI (getCellSignalDbm)
+		local celld csig crat csub cdbm
+		celld=$(dumpsys telephony.registry 2>/dev/null)
+		csig=$(echo "$celld" | awk '/mSignalStrength=SignalStrength/{s=$0} /mDataConnectionState=2/{print s; exit}')
+		[ -z "$csig" ] && csig=$(echo "$celld" | grep -m1 "mSignalStrength=SignalStrength")
+		crat=$(echo "$csig" | grep -oE 'primary=CellSignalStrength[A-Za-z]+' | head -1 | sed 's/.*Strength//')
+		[ -z "$crat" ] && crat=Lte
+		case "$crat" in Nr) label="5G" ;; Lte) label="4G" ;; Wcdma|Tdscdma) label="3G" ;; Gsm|Cdma) label="2G" ;; esac
+		csub=$(echo "$csig" | grep -oE "m$crat=CellSignalStrength$crat[^,]*")
+		cdbm=$(echo "$csub" | grep -oiE '(ss)?rsrp *= *-?[0-9]+' | grep -oE '\-?[0-9]+' | head -1)
+		case "$cdbm" in -*) extra="$extra · ${cdbm} dBm" ;; esac
 	fi
 	[ -f "$MODPATH/active_profile" ] && extra="$extra · $(cat "$MODPATH/active_profile")"
 	[ -f "$MODPATH/adv_buffers" ] && extra="$extra · +16M"
 	# sed uses | as delimiter so the cc/qdisc slash is safe; keep no | in $desc
-	local desc="TCP tuning · $iface $icon · $CURRENT_ALGO/$CURRENT_QDISC$extra"
+	local desc="TCP tuning · $label $icon · $CURRENT_ALGO/$CURRENT_QDISC$extra"
 	sed -i -e "s|^description=.*|description=$desc|" "$MODPATH/module.prop"
 }
 
