@@ -168,24 +168,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 		});
 	}
 
-	// Slide the single active-indicator pill onto the active tab. Width and X are
-	// read from the active item's own box, so it tracks any tab count/label width.
-	function movePill(animate = true) {
-		const nav = document.querySelector('.footer-nav');
-		const pill = nav && nav.querySelector('.nav-pill');
-		const active = nav && nav.querySelector('.nav-item.active');
-		if (!nav || !pill || !active) return;
-		if (!animate) pill.style.transition = 'none';
-		pill.style.width = active.offsetWidth + 'px';
-		pill.style.transform = `translateX(${active.offsetLeft}px)`;
-		if (!animate) requestAnimationFrame(() => { pill.style.transition = ''; });
-	}
-	window.addEventListener('resize', () => movePill(false));
-
 	// Set default page
 	loadPage('home').then(() => {
 		realtimeUpdater();
-		movePill(false);   // initial placement: no slide-in from zero width
 		// Add click event to nav links
 		navLinks.forEach(link => {
 			link.addEventListener('click', (e) => {
@@ -193,7 +178,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 				const page = e.currentTarget.dataset.page;
 				navLinks.forEach(l => l.classList.remove('active'));
 				e.currentTarget.classList.add('active');
-				movePill();
 				loadPage(page);
 			});
 		  });

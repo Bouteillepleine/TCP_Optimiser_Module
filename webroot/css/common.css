@@ -109,14 +109,21 @@ body {
   display: flex; justify-content: space-around; align-items: center;
   box-shadow: 0 14px 34px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
 }
-/* single active indicator that slides between tabs (JS sets width + translateX) */
+/* Single active indicator, slid entirely in CSS (no JS): the 5 tabs are equal
+   flex slots of 20%, each inset by its own 6px margin, so the pill's left is
+   simply index*20% + 6px. The overshooting cubic-bezier gives the bounce. */
 .nav-pill {
-  position: absolute; top: 11%; left: 0; width: 0; height: 78%;
+  position: absolute; top: 11%; height: 78%;
+  left: 6px; width: calc(20% - 12px);
   border-radius: 18px; background: rgba(139,124,255,.14);
-  transform: translateX(0);
-  transition: transform .35s var(--ease), width .35s var(--ease);
+  transition: left .45s cubic-bezier(.34, 1.56, .64, 1);
   pointer-events: none; z-index: 0;
 }
+.nav-item:nth-of-type(1).active ~ .nav-pill { left: 6px; }
+.nav-item:nth-of-type(2).active ~ .nav-pill { left: calc(20% + 6px); }
+.nav-item:nth-of-type(3).active ~ .nav-pill { left: calc(40% + 6px); }
+.nav-item:nth-of-type(4).active ~ .nav-pill { left: calc(60% + 6px); }
+.nav-item:nth-of-type(5).active ~ .nav-pill { left: calc(80% + 6px); }
 .nav-item {
   position: relative; z-index: 1;
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
