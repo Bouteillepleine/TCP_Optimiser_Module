@@ -109,12 +109,21 @@ body {
   display: flex; justify-content: space-around; align-items: center;
   box-shadow: 0 14px 34px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
 }
+/* single active indicator that slides between tabs (JS sets width + translateX) */
+.nav-pill {
+  position: absolute; top: 11%; left: 0; width: 0; height: 78%;
+  border-radius: 18px; background: rgba(139,124,255,.14);
+  transform: translateX(0);
+  transition: transform .35s var(--ease), width .35s var(--ease);
+  pointer-events: none; z-index: 0;
+}
 .nav-item {
+  position: relative; z-index: 1;
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-decoration: none; color: var(--text-secondary); height: 78%; margin: 0 6px;
-  border-radius: 18px; transition: color .25s var(--ease), background .25s var(--ease);
+  border-radius: 18px; transition: color .25s var(--ease);
 }
-.nav-item.active { color: var(--primary); background: rgba(139,124,255,.14); }
+.nav-item.active { color: var(--primary); }
 .nav-icon {
   display: block; flex: none;
   width: 24px; height: 24px; margin-bottom: 3px;
