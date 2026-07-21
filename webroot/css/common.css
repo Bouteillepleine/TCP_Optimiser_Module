@@ -109,13 +109,12 @@ body {
   display: flex; justify-content: space-around; align-items: center;
   box-shadow: 0 14px 34px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
 }
-/* Single active indicator, slid entirely in CSS (no JS). The pill is exactly one
-   tab slot wide (20%) and its 6px transparent side borders reproduce the inset,
-   so it can be moved with translateX(N * 100%) — pure percentages, no calc().
-   That matters: a transition on `left` holding calc()/% values never interpolates
-   in this WebView (it sticks at the start value, which is why the pill refused to
-   move), whereas transforms always interpolate. The overshooting cubic-bezier
-   gives the bounce. */
+/* Single active indicator. The pill is exactly one tab slot wide (20%), so it can
+   be moved with translateX(N * 100%) — pure percentages, no calc(). These rules
+   position it without JS; navpill.js additionally drives the move with
+   element.animate() so the slide survives the main-thread freeze that the
+   blocking ksu.exec calls cause right after a tab tap. The overshooting
+   cubic-bezier gives the bounce. */
 .nav-pill {
   position: absolute; top: 0; left: 0; width: 20%; height: 100%;
   transform: translateX(0);
@@ -141,7 +140,7 @@ body {
 }
 .nav-item.active { color: var(--primary); }
 .nav-icon {
-  display: block; flex: none;
+  display: block; flex: none; will-change: transform;
   width: 24px; height: 24px; margin-bottom: 3px;
   /* soft emboss body: light top-left -> dark bottom-right, filled through the SVG mask */
   background: linear-gradient(155deg, #eef0f6 0%, #c2c4d0 48%, #83879a 100%);
@@ -152,11 +151,11 @@ body {
   filter: drop-shadow(0 -0.5px 0 rgba(255,255,255,.4)) drop-shadow(0 1px 1.2px rgba(0,0,0,.55));
   transition: transform .25s var(--ease), filter .25s var(--ease), background .25s var(--ease);
 }
-.nav-item[data-page="home"] .nav-icon     { -webkit-mask-image: url(../icons/home.svg);     mask-image: url(../icons/home.svg); }
-.nav-item[data-page="settings"] .nav-icon { -webkit-mask-image: url(../icons/settings.svg); mask-image: url(../icons/settings.svg); }
-.nav-item[data-page="tools"] .nav-icon    { -webkit-mask-image: url(../icons/tools.svg);    mask-image: url(../icons/tools.svg); }
-.nav-item[data-page="results"] .nav-icon  { -webkit-mask-image: url(../icons/results.svg);  mask-image: url(../icons/results.svg); }
-.nav-item[data-page="logs"] .nav-icon     { -webkit-mask-image: url(../icons/list.svg);     mask-image: url(../icons/list.svg); }
+.nav-item[data-page="home"] .nav-icon     { -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E %3Cpath fill='white' d='M12 2L2 12h3v8h6v-6h2v6h6v-8h3L12 2z'/%3E %3C/svg%3E");     mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E %3Cpath fill='white' d='M12 2L2 12h3v8h6v-6h2v6h6v-8h3L12 2z'/%3E %3C/svg%3E"); }
+.nav-item[data-page="settings"] .nav-icon { -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E %3Cpath fill='white' d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E %3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E %3Cpath fill='white' d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E %3C/svg%3E"); }
+.nav-item[data-page="tools"] .nav-icon    { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cline x1='4' y1='21' x2='4' y2='14'%3E%3C/line%3E%3Cline x1='4' y1='10' x2='4' y2='3'%3E%3C/line%3E %3Cline x1='12' y1='21' x2='12' y2='12'%3E%3C/line%3E%3Cline x1='12' y1='8' x2='12' y2='3'%3E%3C/line%3E %3Cline x1='20' y1='21' x2='20' y2='16'%3E%3C/line%3E%3Cline x1='20' y1='12' x2='20' y2='3'%3E%3C/line%3E %3Cline x1='1' y1='14' x2='7' y2='14'%3E%3C/line%3E%3Cline x1='9' y1='8' x2='15' y2='8'%3E%3C/line%3E %3Cline x1='17' y1='16' x2='23' y2='16'%3E%3C/line%3E %3C/svg%3E");    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cline x1='4' y1='21' x2='4' y2='14'%3E%3C/line%3E%3Cline x1='4' y1='10' x2='4' y2='3'%3E%3C/line%3E %3Cline x1='12' y1='21' x2='12' y2='12'%3E%3C/line%3E%3Cline x1='12' y1='8' x2='12' y2='3'%3E%3C/line%3E %3Cline x1='20' y1='21' x2='20' y2='16'%3E%3C/line%3E%3Cline x1='20' y1='12' x2='20' y2='3'%3E%3C/line%3E %3Cline x1='1' y1='14' x2='7' y2='14'%3E%3C/line%3E%3Cline x1='9' y1='8' x2='15' y2='8'%3E%3C/line%3E %3Cline x1='17' y1='16' x2='23' y2='16'%3E%3C/line%3E %3C/svg%3E"); }
+.nav-item[data-page="results"] .nav-icon  { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24' fill='white'%3E %3Cpath d='M4 13h3v7H4zM10.5 7h3v13h-3zM17 3h3v17h-3z'/%3E %3C/svg%3E");  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24' fill='white'%3E %3Cpath d='M4 13h3v7H4zM10.5 7h3v13h-3zM17 3h3v17h-3z'/%3E %3C/svg%3E"); }
+.nav-item[data-page="logs"] .nav-icon     { -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E %3Cpath fill='white' d='M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z'/%3E %3C/svg%3E");     mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E %3Cpath fill='white' d='M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z'/%3E %3C/svg%3E"); }
 .nav-item.active .nav-icon {
   /* active: purple relief that lights up */
   background: linear-gradient(155deg, #d6d0ff 0%, #8b7cff 52%, #574ad0 100%);
