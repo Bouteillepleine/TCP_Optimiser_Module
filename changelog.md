@@ -2,14 +2,15 @@
 
 ## v2.7-70 — fixes
 
-- **The watchdog is now a full drift guard.** On OP15, OxygenOS's network stack
-  transiently takes the interface back shortly after boot (own `htb` root qdisc,
-  stock sysctl profile, rebuilt route tables, congestion control reset to the
-  kernel default) — observed live during an audit. The guard now checks root
-  qdisc (anchored to the root line, so a foreign root with an fq_codel leaf no
-  longer passes), global congestion control, per-route `congctl`/`initcwnd` and
-  the buffer ceilings, logs exactly what drifted, and quietly re-asserts —
-  without `ss -K`, so a periodic re-assert never kills live connections.
+- **The watchdog is now a full drift guard.** It only ever checked the qdisc:
+  global congestion control, per-route `congctl`/`initcwnd` and the buffer
+  ceilings had no guard at all — if any network event re-applied part of the
+  OS's stock state (on OP15 that state is an `htb` root, 8.8M buffer maxes,
+  bare routes, kernel-default cc), it stuck silently. The guard now checks all
+  of it, logs exactly what drifted, and quietly re-asserts — without `ss -K`,
+  so a periodic re-assert never kills live connections. The qdisc check is also
+  anchored to the root line: a foreign root with an fq_codel leaf under it no
+  longer passes.
 - Heartbeat file written atomically (write + rename); readers no longer catch a
   truncated `.qdisc_guard`.
 - Advanced-buffers log line only appears when something was actually raised.

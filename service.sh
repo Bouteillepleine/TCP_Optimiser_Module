@@ -440,15 +440,16 @@ apply_cellular_settings() {
 	return $applied
 }
 
-# Drift guard. OxygenOS's network stack transiently takes the interface back
-# (observed on OP15 ~1 min after boot: its own `htb default 1` root, stock
-# sysctl profile incl. 8.8M buffer maxes, rebuilt route tables, cc reset to the
-# kernel default). If such a window ends in the drifted state, nothing else in
-# the module converges back — so guard ALL of it, not just the qdisc: root
-# qdisc, global cc, per-route congctl, initcwnd, buffer ceilings. Re-asserts
-# are quiet (no ss -K — killing every TCP connection on a periodic guard would
-# be destructive) and each drift is logged with what drifted, which doubles as
-# forensics on when/what OxygenOS touches.
+# Drift guard. Before this module's apply cycle, OxygenOS owns the interface
+# with its own state (on OP15: an `htb default 1` root qdisc, stock sysctl
+# profile incl. 8.8M buffer maxes, bare route tables, cc at the kernel
+# default) — and any later network event that re-applies parts of that stock
+# state would previously stick, because nothing in the module converged back.
+# So guard ALL of it, not just the qdisc: root qdisc, global cc, per-route
+# congctl, initcwnd, buffer ceilings. Re-asserts are quiet (no ss -K — killing
+# every TCP connection on a periodic guard would be destructive) and each
+# drift is logged with what drifted, which doubles as forensics on when/what
+# the OS touches.
 run_qdisc_watchdog() {
     local watch_iface="$1"
     local mode="$2"
