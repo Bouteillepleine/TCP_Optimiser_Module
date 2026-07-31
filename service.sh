@@ -176,10 +176,11 @@ set_qdisc() {
     fi
 
 	sleep 2
-	# Match the qdisc name on a word boundary: a bare `grep "$qdisc"` reports
-	# success for "fq" when the link is actually still running fq_codel / fq_pie
-	# (same trap for pfifo vs pfifo_fast / pfifo_head_drop).
-	local check_qdisc=$(get_active_root_qdisc "$iface" | grep -E "^qdisc ${qdisc}[[:space:]]")
+	# Match the qdisc name on a word boundary AND anchored to the root: a bare
+	# `grep "$qdisc"` reports success for "fq" when the link actually runs
+	# fq_codel (same trap for pfifo vs pfifo_fast), and an unanchored line match
+	# is satisfied by a leaf — e.g. OxygenOS's htb root with an fq_codel child.
+	local check_qdisc=$(get_active_root_qdisc "$iface" | grep -E "^qdisc ${qdisc} [0-9a-f]+: root")
 	if [ -n "$check_qdisc" ]; then
 		log_print "Applied qdisc: $qdisc ($iface)"
 		sleep 0.1
@@ -347,28 +348,32 @@ apply_tcp_buffers() {
 	# tuned ROM is never degraded. Global sysctls; disabling reverts on reboot.
 	[ -f "$MODPATH/adv_buffers" ] || return 0
 	local target=16777216
+	local changed=0
 
 	# core ceilings: raise only
 	for f in /proc/sys/net/core/rmem_max /proc/sys/net/core/wmem_max; do
 		cur=$(cat "$f" 2>/dev/null)
-		[ -n "$cur" ] && [ "$cur" -lt "$target" ] && echo "$target" > "$f" 2>/dev/null
+		[ -n "$cur" ] && [ "$cur" -lt "$target" ] && echo "$target" > "$f" 2>/dev/null && changed=1
 	done
 
 	# tcp_rmem / tcp_wmem: keep "min default", raise only the max
 	for f in /proc/sys/net/ipv4/tcp_rmem /proc/sys/net/ipv4/tcp_wmem; do
 		set -- $(cat "$f" 2>/dev/null)
-		[ -n "$3" ] && [ "$3" -lt "$target" ] && echo "$1 $2 $target" > "$f" 2>/dev/null
+		[ -n "$3" ] && [ "$3" -lt "$target" ] && echo "$1 $2 $target" > "$f" 2>/dev/null && changed=1
 	done
 
 	# tolerate more packet reordering before cutting cwnd (helps on wide /
 	# aggregated Wi-Fi where frames arrive out of order) — raise only, default 300
 	cur=$(cat /proc/sys/net/ipv4/tcp_max_reordering 2>/dev/null)
-	[ -n "$cur" ] && [ "$cur" -lt 1000 ] && echo 1000 > /proc/sys/net/ipv4/tcp_max_reordering 2>/dev/null
+	[ -n "$cur" ] && [ "$cur" -lt 1000 ] && echo 1000 > /proc/sys/net/ipv4/tcp_max_reordering 2>/dev/null && changed=1
 
 	# strict improvements (idempotent): keep cwnd across idle, probe PMTU
 	echo 0 > /proc/sys/net/ipv4/tcp_slow_start_after_idle 2>/dev/null
 	echo 1 > /proc/sys/net/ipv4/tcp_mtu_probing 2>/dev/null
-	log_print "Advanced TCP buffers: raised socket-buffer ceilings to >=16MiB + tcp_max_reordering>=1000 (min/default preserved)"
+	# log only when something was actually raised — this also runs from the
+	# 30/60s drift guard, which would otherwise spam the (200-line) log
+	[ "$changed" -eq 1 ] && log_print "Advanced TCP buffers: raised socket-buffer ceilings to >=16MiB + tcp_max_reordering>=1000 (min/default preserved)"
+	return 0
 }
 
 apply_wifi_settings() {
@@ -435,31 +440,33 @@ apply_cellular_settings() {
 	return $applied
 }
 
+# Drift guard. OxygenOS's network stack transiently takes the interface back
+# (observed on OP15 ~1 min after boot: its own `htb default 1` root, stock
+# sysctl profile incl. 8.8M buffer maxes, rebuilt route tables, cc reset to the
+# kernel default). If such a window ends in the drifted state, nothing else in
+# the module converges back — so guard ALL of it, not just the qdisc: root
+# qdisc, global cc, per-route congctl, initcwnd, buffer ceilings. Re-asserts
+# are quiet (no ss -K — killing every TCP connection on a periodic guard would
+# be destructive) and each drift is logged with what drifted, which doubles as
+# forensics on when/what OxygenOS touches.
 run_qdisc_watchdog() {
     local watch_iface="$1"
     local mode="$2"
 	local sleep_interval="${3:-15}"
 	local target_qdisc=""
+	local target_algo=""
+	local prefix="wlan"
 
-	if [ "$mode" = "Wi-Fi" ]; then
-		for algo in $congestion_algorithms; do
-			for filepath in "$MODPATH/wlan_${algo}_"*; do
-				if [ -f "$filepath" ]; then
-					target_qdisc=$(extract_qdisc_from_path "$filepath" "$algo")
-					break 2
-				fi
-			done
+	[ "$mode" = "Cellular" ] && prefix="rmnet_data"
+	for algo in $congestion_algorithms; do
+		for filepath in "$MODPATH/${prefix}_${algo}_"*; do
+			if [ -f "$filepath" ]; then
+				target_algo="$algo"
+				target_qdisc=$(extract_qdisc_from_path "$filepath" "$algo")
+				break 2
+			fi
 		done
-	elif [ "$mode" = "Cellular" ]; then
-		for algo in $congestion_algorithms; do
-			for filepath in "$MODPATH/rmnet_data_${algo}_"*; do
-				if [ -f "$filepath" ]; then
-					target_qdisc=$(extract_qdisc_from_path "$filepath" "$algo")
-					break 2
-				fi
-			done
-		done
-	fi
+	done
 
 	# No marker file => apply_{wifi,cellular}_settings applied no qdisc at all
 	# (it only falls back to cubic). Forcing htb/multiq here would install a
@@ -470,7 +477,7 @@ run_qdisc_watchdog() {
 		return 0
 	fi
 
-    log_print "[WATCHDOG] Started monitoring $watch_iface for $target_qdisc..."
+    log_print "[WATCHDOG] Guarding $watch_iface: qdisc=$target_qdisc cc=$target_algo"
 
     while true; do
         local link_state=""
@@ -484,18 +491,56 @@ run_qdisc_watchdog() {
             break
         fi
 
-        # heartbeat for the WebUI "Guarding" indicator (freshness = still alive)
-        echo "$watch_iface $target_qdisc" > "$MODPATH/.qdisc_guard"
+        # heartbeat for the WebUI "Guarding" indicator (freshness = still alive);
+        # write-then-rename so a concurrent reader never sees a truncated file
+        echo "$watch_iface $target_qdisc" > "$MODPATH/.qdisc_guard.tmp" && \
+            mv -f "$MODPATH/.qdisc_guard.tmp" "$MODPATH/.qdisc_guard"
 
+        local drift=""
+
+        # 1. root qdisc — anchored to the root line; an fq_codel LEAF under a
+        #    foreign htb root must not satisfy the check
         local current_status=$(get_active_root_qdisc "$watch_iface")
-        # word-boundary match, else a target of "fq" is satisfied by "fq_codel"
-        if ! echo "$current_status" | grep -qE "^qdisc ${target_qdisc}[[:space:]]"; then
-            log_print "[!] Hijack detected on $watch_iface!"
-            log_print "[!] Current state: $(echo "$current_status" | head -n 1)"
-            log_print "[#] Re-applying $target_qdisc optimization..."
-            
-			set_qdisc "$watch_iface" "$target_qdisc" "$mode"
-			set_max_initcwnd_initrwnd "$watch_iface"
+        echo "$current_status" | grep -qE "^qdisc ${target_qdisc} [0-9a-f]+: root" || drift="qdisc"
+
+        # 2. global congestion control
+        local cur_cc=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null)
+        [ "$cur_cc" = "$target_algo" ] || drift="$drift cc($cur_cc)"
+
+        # 3. route pinning — only judged when a default route exists (a missing
+        #    default is a transient netd rebuild; re-pinning mid-rebuild thrashes)
+        local def_route=$(ip route show table "$watch_iface" 2>/dev/null | grep '^default')
+        if [ -n "$def_route" ]; then
+            case "$def_route" in
+                *"congctl $target_algo "*|*"congctl $target_algo") ;;
+                *) drift="$drift route" ;;
+            esac
+            if [ -f "$MODPATH/initcwnd_initrwnd" ]; then
+                case "$def_route" in
+                    *"initcwnd "*) ;;
+                    *) drift="$drift initcwnd" ;;
+                esac
+            fi
+        fi
+
+        # 4. buffer ceilings (only meaningful when the toggle is on)
+        if [ -f "$MODPATH/adv_buffers" ]; then
+            set -- $(cat /proc/sys/net/ipv4/tcp_rmem 2>/dev/null)
+            [ -n "$3" ] && [ "$3" -lt 16777216 ] && drift="$drift buffers"
+        fi
+
+        if [ -n "$drift" ]; then
+            log_print "[!] Drift on $watch_iface: $drift"
+            case "$drift" in *"qdisc"*)
+                log_print "[!] Root was: $(echo "$current_status" | head -n 1)"
+                set_qdisc "$watch_iface" "$target_qdisc" "$mode"
+            ;; esac
+            # quiet cc + route re-assert: no ss -K, no description rewrite
+            echo "$target_algo" > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null
+            set_route_congctl "$watch_iface" "$target_algo"
+            set_max_initcwnd_initrwnd "$watch_iface"
+            apply_tcp_buffers
+            log_print "[#] Re-asserted qdisc=$target_qdisc cc=$target_algo on $watch_iface"
         fi
         sleep "$sleep_interval"
     done

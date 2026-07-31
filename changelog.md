@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.7-70 — fixes
+
+- **The watchdog is now a full drift guard.** On OP15, OxygenOS's network stack
+  transiently takes the interface back shortly after boot (own `htb` root qdisc,
+  stock sysctl profile, rebuilt route tables, congestion control reset to the
+  kernel default) — observed live during an audit. The guard now checks root
+  qdisc (anchored to the root line, so a foreign root with an fq_codel leaf no
+  longer passes), global congestion control, per-route `congctl`/`initcwnd` and
+  the buffer ceilings, logs exactly what drifted, and quietly re-asserts —
+  without `ss -K`, so a periodic re-assert never kills live connections.
+- Heartbeat file written atomically (write + rename); readers no longer catch a
+  truncated `.qdisc_guard`.
+- Advanced-buffers log line only appears when something was actually raised.
+
 ## v2.7-69 — fixes
 
 - **Auto-Optimize probes every available congestion control** (reno excluded).
