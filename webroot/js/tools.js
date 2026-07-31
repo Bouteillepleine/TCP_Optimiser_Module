@@ -469,6 +469,18 @@ function teleToggle(btn) {
   requestAnimationFrame(teleAnim);
 }
 
+// Pause/resume the daemon's drift guard around probe runs that change cc/qdisc
+// live on purpose (Auto-Optimize, CC duel) — otherwise the guard reverts the
+// probe's settings mid-measurement and corrupts the numbers. The guard caps the
+// pause at 10 min, so a crashed WebUI can never disable it permanently.
+async function guardPause(on) {
+  try {
+    const md = router_state.moduleInformation.moduleDir;
+    if (on) await exec(`date +%s > ${md}/.guard_pause && chmod 644 ${md}/.guard_pause`);
+    else await exec(`rm -f ${md}/.guard_pause`);
+  } catch (e) { console.error('guardPause', e); }
+}
+
 /* ---------- CC A/B duel ---------- */
 // One single-stream timed download per algorithm over the same mirror. We flip
 // the cc per leg by BOTH the global sysctl AND the active interface's per-route
@@ -527,6 +539,7 @@ async function runAb(btn) {
   await new Promise(r => setTimeout(r, 30));
 
   try {
+    await guardPause(true);
     const { stdout } = await exec(abScript(ccA, ccB));
     const m = stdout.match(/ABRES a=([\d.]+) (\d+) b=([\d.]+) (\d+)/);
     clearNode(out);
@@ -549,6 +562,7 @@ async function runAb(btn) {
     clearNode(out);
     out.appendChild(row('Test error.', ''));
   } finally {
+    await guardPause(false);
     btn.classList.remove('busy');
     clearNode(btn);
     btn.textContent = btnLabel;
@@ -661,6 +675,7 @@ async function runAuto(btn) {
   const list = el('div', 'auto-list');
   out.appendChild(list);
   try {
+    await guardPause(true);
     let n = 0;
     for (const combo of combos) {
       n++;
@@ -747,6 +762,7 @@ async function runAuto(btn) {
     if (origCc) await exec(`echo ${origCc} > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null`);
     await stopLoad();
   } finally {
+    await guardPause(false);
     btn.classList.remove('busy'); clearNode(btn); btn.textContent = btnLabel;
   }
 }

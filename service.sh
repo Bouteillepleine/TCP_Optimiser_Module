@@ -480,6 +480,7 @@ run_qdisc_watchdog() {
 
     log_print "[WATCHDOG] Guarding $watch_iface: qdisc=$target_qdisc cc=$target_algo"
 
+    local guard_paused=0
     while true; do
         local link_state=""
         if [ -f "/sys/class/net/$watch_iface/operstate" ]; then
@@ -496,6 +497,31 @@ run_qdisc_watchdog() {
         # write-then-rename so a concurrent reader never sees a truncated file
         echo "$watch_iface $target_qdisc" > "$MODPATH/.qdisc_guard.tmp" && \
             mv -f "$MODPATH/.qdisc_guard.tmp" "$MODPATH/.qdisc_guard"
+
+        # WebUI probe runs (Auto-Optimize, CC duel) change cc/qdisc live ON
+        # PURPOSE; fighting them corrupts the measurements (seen live: the guard
+        # reverted cake->fq_codel and cubic->bbr mid-probe four times during an
+        # Auto-Optimize run). The WebUI drops .guard_pause for the duration;
+        # honor it, capped at 10 min so a crashed WebUI can never disable the
+        # guard permanently.
+        if [ -f "$MODPATH/.guard_pause" ]; then
+            local pt=$(stat -c '%Y' "$MODPATH/.guard_pause" 2>/dev/null)
+            local page=999999
+            [ -n "$pt" ] && page=$(( $(date +%s) - pt ))
+            if [ "$page" -lt 600 ]; then
+                if [ "$guard_paused" -eq 0 ]; then
+                    log_print "[WATCHDOG] Paused - WebUI test running"
+                    guard_paused=1
+                fi
+                sleep "$sleep_interval"
+                continue
+            fi
+            rm -f "$MODPATH/.guard_pause"
+        fi
+        if [ "$guard_paused" -eq 1 ]; then
+            log_print "[WATCHDOG] Resumed"
+            guard_paused=0
+        fi
 
         local drift=""
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.7-71 — fixes
+
+- **The drift guard no longer fights WebUI tests.** Auto-Optimize and the CC
+  duel change cc/qdisc live on purpose while measuring; the v70 guard treated
+  those probes as drift and reverted them mid-run (observed live: four reverts
+  during one Auto-Optimize, corrupting the scores that picked the winner). The
+  WebUI now pauses the guard for the duration of a test; the pause is capped at
+  10 minutes so a crashed WebUI can never disable the guard permanently.
+
 ## v2.7-70 — fixes
 
 - **The watchdog is now a full drift guard.** It only ever checked the qdisc:
