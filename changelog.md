@@ -1,6 +1,31 @@
 # Changelog
 
-## v2.7 — current
+## v2.7-67 — fixes
+
+- Socket buffers are now **raise-only everywhere**. The boot-time block used to
+  overwrite `tcp_rmem`/`tcp_wmem` with a fixed `4096 2097152 16777216`, replacing
+  the ROM's tuned min/default with a 2 MiB per-socket default and pre-empting the
+  Advanced TCP buffers toggle. It now only ever raises the ceiling.
+- `tcp_mtu_probing` is set to **1**, not 0. The old value downgraded ROMs (such as
+  OxygenOS) that already ship 1, and contradicted the Advanced-buffers path.
+- **initcwnd / initrwnd now reach the routes that carry traffic.** They were only
+  written to the `main` table, which on Android holds just the on-link LAN route —
+  the `default` route lives in the per-interface table. Both tables are covered now,
+  matching how congestion-control pinning already worked.
+- **qdisc checks match on a word boundary.** `fq` was satisfied by a live `fq_codel`
+  (likewise `pfifo` by `pfifo_fast`), so an apply could report success after failing
+  and the watchdog would never notice a hijack.
+- **VoWiFi detection works on OxygenOS.** The daemon still used the AOSP
+  `slot='vowifi'` string, which OxygenOS never prints, so every fresh Wi-Fi
+  connection waited out the full 20 s timeout before applying settings.
+- **The qdisc watchdog no longer invents a qdisc.** With no marker file it used to
+  force `htb` (Wi-Fi) / `multiq` (Cellular) even though the apply path had set no
+  qdisc at all; it now guards nothing.
+- **VPN interfaces resolve to the physical link.** With a tunnel up, `tun0` was
+  treated as Wi-Fi, so the qdisc landed on the tunnel instead of the real
+  bottleneck and route pinning silently did nothing.
+
+## v2.7 — earlier
 
 WebUI network tuner: per-interface TCP tuning with one-tap profiles, live
 telemetry and a saved test history.

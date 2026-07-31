@@ -79,21 +79,43 @@ set_max_initcwnd_initrwnd() {
 		# service is already root). This collapses ~14 /data/adb execs into 2,
 		# which keeps OxygenOS's kernel anti-tamper from tripping the "malicious
 		# app" popup when settings are (re)applied.
+		# Android policy routing keeps the operative routes - including `default` -
+		# in the per-interface table, while `main` only holds the on-link LAN
+		# route. Writing initcwnd/initrwnd to `main` alone therefore never touched
+		# internet traffic. Cover both tables, exactly like set_route_congctl.
 		while IFS= read -r line; do
 			[ -z "$line" ] && continue
-			cmds4="${cmds4}/system/bin/ip route change $line initcwnd 10 initrwnd $maxInitrwndValue
+			case "$line" in unreachable*|throw*|blackhole*|prohibit*) continue ;; esac
+			cmds4="${cmds4}/system/bin/ip route change $line initcwnd 10 initrwnd $maxInitrwndValue 2>/dev/null
 "
 		done <<EOF
 $(/system/bin/ip route show 2>/dev/null | grep "dev $active_iface")
+EOF
+		while IFS= read -r line; do
+			[ -z "$line" ] && continue
+			case "$line" in unreachable*|throw*|blackhole*|prohibit*) continue ;; esac
+			cmds4="${cmds4}/system/bin/ip route change $line table $active_iface initcwnd 10 initrwnd $maxInitrwndValue 2>/dev/null
+"
+		done <<EOF
+$(/system/bin/ip route show table "$active_iface" 2>/dev/null)
 EOF
 		[ -n "$cmds4" ] && run_as_su "$cmds4" && applied=1
 
 		while IFS= read -r line; do
 			[ -z "$line" ] && continue
-			cmds6="${cmds6}/system/bin/ip -6 route change $line initcwnd 10 initrwnd $maxInitrwndValue
+			case "$line" in unreachable*|throw*|blackhole*|prohibit*) continue ;; esac
+			cmds6="${cmds6}/system/bin/ip -6 route change $line initcwnd 10 initrwnd $maxInitrwndValue 2>/dev/null
 "
 		done <<EOF
 $(/system/bin/ip -6 route show 2>/dev/null | grep "dev $active_iface")
+EOF
+		while IFS= read -r line; do
+			[ -z "$line" ] && continue
+			case "$line" in unreachable*|throw*|blackhole*|prohibit*) continue ;; esac
+			cmds6="${cmds6}/system/bin/ip -6 route change $line table $active_iface initcwnd 10 initrwnd $maxInitrwndValue 2>/dev/null
+"
+		done <<EOF
+$(/system/bin/ip -6 route show table "$active_iface" 2>/dev/null)
 EOF
 		[ -n "$cmds6" ] && run_as_su "$cmds6" && applied=1
 
@@ -154,7 +176,10 @@ set_qdisc() {
     fi
 
 	sleep 2
-	local check_qdisc=$(get_active_root_qdisc "$iface" | grep "$qdisc")
+	# Match the qdisc name on a word boundary: a bare `grep "$qdisc"` reports
+	# success for "fq" when the link is actually still running fq_codel / fq_pie
+	# (same trap for pfifo vs pfifo_fast / pfifo_head_drop).
+	local check_qdisc=$(get_active_root_qdisc "$iface" | grep -E "^qdisc ${qdisc}[[:space:]]")
 	if [ -n "$check_qdisc" ]; then
 		log_print "Applied qdisc: $qdisc ($iface)"
 		sleep 0.1
@@ -264,6 +289,32 @@ set_tcp_pacing() {
 
 get_active_iface() {
 	iface=$(ip route get 192.0.2.1 2>/dev/null | grep -o "dev [^ ]*" | awk '{print $2}')
+	echo "$iface"
+}
+
+# With a VPN up the default route points at tun0, but tuning tun0 is useless:
+# the bottleneck is the physical link underneath, `ip route show table tun0` is
+# empty so congctl pinning is a no-op, and get_wifi_freq finds no band. Resolve
+# a tunnel to the physical interface that actually carries the traffic.
+resolve_phys_iface() {
+	local iface="$1" cand st
+	case "$iface" in
+		tun*|ppp*|ipsec*|wg*) ;;
+		*) echo "$iface"; return ;;
+	esac
+	# Wi-Fi first: Android prefers it as the default transport whenever it is
+	# connected, and the cellular interfaces stay registered (with default routes
+	# in their tables) even while Wi-Fi carries the traffic. Skip the r_rmnet_*
+	# reverse-tether devices. Note rmnet links report operstate "unknown", never
+	# "up", so accept both.
+	for cand in $(ls /sys/class/net 2>/dev/null | grep -E '^wlan') \
+	            $(ls /sys/class/net 2>/dev/null | grep -E '^(rmnet_data|ccmni)'); do
+		st=$(cat "/sys/class/net/$cand/operstate" 2>/dev/null)
+		[ "$st" = "up" ] || [ "$st" = "unknown" ] || continue
+		ip route show table "$cand" 2>/dev/null | grep -q '^default' || continue
+		echo "$cand"
+		return
+	done
 	echo "$iface"
 }
 
@@ -410,10 +461,15 @@ run_qdisc_watchdog() {
 		done
 	fi
 
+	# No marker file => apply_{wifi,cellular}_settings applied no qdisc at all
+	# (it only falls back to cubic). Forcing htb/multiq here would install a
+	# qdisc the user never chose, so guard nothing instead.
 	if [ -z "$target_qdisc" ]; then
-        if [ "$mode" = "Wi-Fi" ]; then target_qdisc="htb"; else target_qdisc="multiq"; fi
-    fi
-    
+		log_print "[WATCHDOG] No qdisc marker for $mode - nothing to guard on $watch_iface."
+		rm -f "$MODPATH/.qdisc_guard"
+		return 0
+	fi
+
     log_print "[WATCHDOG] Started monitoring $watch_iface for $target_qdisc..."
 
     while true; do
@@ -432,7 +488,8 @@ run_qdisc_watchdog() {
         echo "$watch_iface $target_qdisc" > "$MODPATH/.qdisc_guard"
 
         local current_status=$(get_active_root_qdisc "$watch_iface")
-        if ! echo "$current_status" | grep -q "$target_qdisc"; then
+        # word-boundary match, else a target of "fq" is satisfied by "fq_codel"
+        if ! echo "$current_status" | grep -qE "^qdisc ${target_qdisc}[[:space:]]"; then
             log_print "[!] Hijack detected on $watch_iface!"
             log_print "[!] Current state: $(echo "$current_status" | head -n 1)"
             log_print "[#] Re-applying $target_qdisc optimization..."
@@ -467,18 +524,28 @@ echo "fq_codel" > /proc/sys/net/core/default_qdisc 2>/dev/null
 echo 120 > /proc/sys/net/ipv4/tcp_pacing_ca_ratio 2>/dev/null
 echo 180 > /proc/sys/net/ipv4/tcp_pacing_ss_ratio 2>/dev/null
 echo 1 > /proc/sys/net/ipv4/tcp_window_scaling 2>/dev/null
-echo "4096 2097152 16777216" > /proc/sys/net/ipv4/tcp_rmem 2>/dev/null
-echo "4096 2097152 16777216" > /proc/sys/net/ipv4/tcp_wmem 2>/dev/null
-echo 16777216 > /proc/sys/net/core/rmem_max 2>/dev/null
-echo 16777216 > /proc/sys/net/core/wmem_max 2>/dev/null
+
+# Socket buffers: RAISE ONLY, same rule as apply_tcp_buffers(). The old fixed
+# "4096 2097152 16777216" replaced the ROM's tuned min & default (OxygenOS ships
+# 524288 1048576 16777216) with a 2 MiB default per socket, and pre-empted the
+# "Advanced TCP buffers" toggle by putting the ceilings at 16 MiB unconditionally.
+for f in /proc/sys/net/core/rmem_max /proc/sys/net/core/wmem_max; do
+	cur=$(cat "$f" 2>/dev/null)
+	[ -n "$cur" ] && [ "$cur" -lt 16777216 ] && echo 16777216 > "$f" 2>/dev/null
+done
+for f in /proc/sys/net/ipv4/tcp_rmem /proc/sys/net/ipv4/tcp_wmem \
+         /proc/sys/net/ipv6/tcp_rmem /proc/sys/net/ipv6/tcp_wmem; do
+	set -- $(cat "$f" 2>/dev/null)
+	[ -n "$3" ] && [ "$3" -lt 16777216 ] && echo "$1 $2 16777216" > "$f" 2>/dev/null
+done
+
 echo 4096 > /proc/sys/net/ipv4/tcp_max_syn_backlog 2>/dev/null
-echo 0 > /proc/sys/net/ipv4/tcp_mtu_probing 2>/dev/null
+# PMTU probing: OxygenOS already ships 1; writing 0 downgraded the ROM every boot.
+echo 1 > /proc/sys/net/ipv4/tcp_mtu_probing 2>/dev/null
 echo 16384 > /proc/sys/net/ipv4/tcp_notsent_lowat 2>/dev/null
 
 # IPv6 TCP tuning
 echo 1 > /proc/sys/net/ipv6/tcp_ecn 2>/dev/null
-echo "4096 2097152 16777216" > /proc/sys/net/ipv6/tcp_rmem 2>/dev/null
-echo "4096 2097152 16777216" > /proc/sys/net/ipv6/tcp_wmem 2>/dev/null
 
 # Extra settings for optimal stability
 echo 100000 > /proc/sys/net/core/netdev_max_backlog 2>/dev/null
@@ -524,11 +591,14 @@ current_time=0
 
 while true; do
 	iface=$(get_active_iface)
+	iface=$(resolve_phys_iface "$iface")
 
 	new_mode="none"
 	case "$iface" in
-		wlan*|tun*) new_mode="Wi-Fi" ;;
+		wlan*) new_mode="Wi-Fi" ;;
 		*rmnet*|*ccmni*) new_mode="Cellular" ;;
+		# unresolved tunnel (no physical link found): keep the old Wi-Fi default
+		tun*|ppp*|ipsec*|wg*) new_mode="Wi-Fi" ;;
 		*) new_mode="none" ;;
 	esac
 

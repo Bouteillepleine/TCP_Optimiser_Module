@@ -40,7 +40,14 @@ run_tc() {
 get_wifi_calling_state() {
 	rm -f "$DUMPSYS_TMP_FILE"
 	dumpsys activity service SystemUIService > "$DUMPSYS_TMP_FILE" 2>/dev/null
-	grep -qEm 1 "slot='vowifi'.*visible user=.*" "$DUMPSYS_TMP_FILE"
+	# OxygenOS never prints the AOSP `slot='vowifi' ... visible user=` string, so
+	# the old pattern never matched and every fresh Wi-Fi join sat out the full
+	# VOWIFI_CONNECT_TIME timeout. Mirror the OxygenOS status-bar icon instead -
+	# `NN:(vowifi) holder=StatusBarIconHolder(... visible=true)` / IMS
+	# `vowifiState=true` - the same rule the WebUI uses (common.js
+	# get_wifi_calling_state). The AOSP pattern is kept as a fallback for
+	# non-OPlus ROMs.
+	grep -qEm 1 "\(vowifi\).*visible=true|vowifiState=true|slot='vowifi'.*visible user=" "$DUMPSYS_TMP_FILE"
 	local status=$?
 	rm -f "$DUMPSYS_TMP_FILE"
 	# echo's result: 0 = true (VoWiFi active), 1 = false
