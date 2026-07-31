@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.7-69 — fixes
+
+- **Auto-Optimize probes every available congestion control** (reno excluded).
+  It used a fixed bbr3/bbr/cubic whitelist, so any other algorithm registered in
+  the kernel — including custom or out-of-tree ones — was silently left out of
+  the search.
+
 ## v2.7-68 — fixes
 
 - **Upgrades no longer reset your settings.** The installer only carried over the

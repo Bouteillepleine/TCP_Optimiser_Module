@@ -579,17 +579,18 @@ async function abPopulate() {
 // A few (cc, qdisc) combos are probed on the CURRENT connection; the one with the
 // best throughput-vs-bufferbloat wins and is applied + persisted. cc is resolved
 // against the kernel's available algorithms.
-// The meaningful search space: each distinct congestion control (best BBR + CUBIC)
-// crossed with each fair/AQM qdisc. FIFO qdiscs (pfifo/bfifo/pfifo_fast) and the
-// classful wrappers are skipped — no AQM, so they can only worsen bufferbloat —
-// and reno is strictly weaker than cubic/bbr; probing them all would add ~10 min
-// of downloads for combos that cannot win.
+// The meaningful search space: every registered congestion control crossed with
+// each fair/AQM qdisc. FIFO qdiscs (pfifo/bfifo/pfifo_fast) and the classful
+// wrappers are skipped — no AQM, so they can only worsen bufferbloat — and reno
+// is excluded (strictly weaker than cubic/bbr; a probe it cannot win). No fixed
+// whitelist: a custom / out-of-tree algorithm registered in the kernel is probed
+// like any other, instead of being silently dropped from the search.
 const AUTO_QDISCS = ['cake', 'fq_codel', 'fq'];
 async function autoCcSet() {
   try {
     const { stdout } = await exec('cat /proc/sys/net/ipv4/tcp_available_congestion_control');
     const have = stdout.trim().split(/\s+/);
-    const set = ['bbr3', 'bbr', 'cubic'].filter(a => have.includes(a));
+    const set = have.filter(a => a && a !== 'reno');
     return set.length ? set : [have[0] || 'cubic'];
   } catch { return ['cubic']; }
 }

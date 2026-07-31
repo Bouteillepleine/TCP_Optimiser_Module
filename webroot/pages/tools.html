@@ -24,7 +24,7 @@
 
 <div class="card">
   <div class="card-header"><h3>Auto-Optimize</h3></div>
-  <p class="hint">Probes each congestion control (bbr3 / bbr / cubic) × AQM qdisc (cake / fq_codel / fq) on <b>this</b> connection and applies the best throughput-vs-bufferbloat. ~3 min, uses data (Wi-Fi recommended).</p>
+  <p class="hint">Probes every available congestion control (except reno) × AQM qdisc (cake / fq_codel / fq) on <b>this</b> connection and applies the best throughput-vs-bufferbloat. ~3 min, uses data (Wi-Fi recommended).</p>
   <button id="auto-run" class="big-btn">Find &amp; Apply Best</button>
   <div id="auto-out" class="result-box hidden"></div>
 </div>
