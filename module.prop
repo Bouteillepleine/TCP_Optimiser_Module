@@ -1,7 +1,7 @@
 id=tcp_optimiser
 name=TCP Optimiser 
-version=v2.7-67
-versionCode=67
+version=v2.7-68
+versionCode=68
 author=fatalcoder524
 description=WebUI interface TCP congestion control + qdisc tuning
 updateJson=

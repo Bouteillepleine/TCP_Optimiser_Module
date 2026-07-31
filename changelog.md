@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.7-68 — fixes
+
+- **Upgrades no longer reset your settings.** The installer only carried over the
+  cc/qdisc markers; the Advanced TCP buffers toggle, Smart-cake hints, active
+  profile label and the entire Results-tab test history were silently lost on
+  every update. All of them are preserved now.
+
 ## v2.7-67 — fixes
 
 - Socket buffers are now **raise-only everywhere**. The boot-time block used to

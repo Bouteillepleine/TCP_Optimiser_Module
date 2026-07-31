@@ -122,6 +122,18 @@ if check_exists_anywhere "initcwnd"; then
     fi
 fi
 
+# Preserve the remaining per-user state across upgrades. The wlan_*/rmnet_data_*/
+# kill_connections/initcwnd_initrwnd markers are carried over above, but the
+# newer 2.7 state files were not, so every upgrade silently reset the Advanced
+# TCP buffers toggle, the Smart-cake hints, the active profile label and wiped
+# the whole Results-tab test history.
+for m in adv_buffers cake_hint_wlan cake_hint_rmnet active_profile bench_results.jsonl; do
+    if [ -f "$MODULE_PATH/$m" ] && [ ! -f "$MODPATH/$m" ]; then
+        cp "$MODULE_PATH/$m" "$MODPATH/$m"
+        ui_print " [+] Preserved user state: $m"
+    fi
+done
+
 cp "$MODPATH/module.prop" "$MODPATH/module.prop.bak"
 
 chmod +x "$MODPATH/bin/tc"
