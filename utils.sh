@@ -26,10 +26,8 @@ log_print() {
 }
 
 run_as_su() {
-	local cmd="$*"
-	su -c "$cmd"
-	local status=$?
-	return $status
+	# already root; run directly instead of re-spawning su
+	eval "$*"
 }
 
 run_tc() {

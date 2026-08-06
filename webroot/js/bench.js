@@ -65,9 +65,7 @@ export function recordKey (r) {
 	return String(r.id != null ? r.id : r.ts);
 }
 
-// Append one record (JSON on a single line via single-quoted printf — our values
-// are numbers / short tokens, no single quotes to escape). A unique `id` is
-// stamped in so a single result can be deleted later without ambiguity.
+// Append one record, base64-encoded so no field value can break the shell redirect.
 export async function saveBenchResult (record) {
 	try {
 		if (record.id == null) {
@@ -75,7 +73,8 @@ export async function saveBenchResult (record) {
 				Math.random().toString(36).slice(2, 8);
 		}
 		const json = JSON.stringify(record);
-		await exec(`printf '%s\\n' '${json}' >> ${STORE}`);
+		const b64 = btoa(unescape(encodeURIComponent(json + '\n')));
+		await exec(`echo '${b64}' | base64 -d >> ${STORE}`);
 		return true;
 	} catch (error) {
 		console.error('Error saving benchmark result:', error);

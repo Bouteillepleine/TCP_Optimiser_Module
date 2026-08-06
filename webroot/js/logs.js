@@ -55,7 +55,7 @@ export function updateLogsUI () {
 			router_state.logsList.forEach(log => {
 				addLogToScreen(log);
 			});
-			router_state.logsList.length = prev_logs_count;
+			prev_logs_count = router_state.logsList.length;
 		}
 	}
 }

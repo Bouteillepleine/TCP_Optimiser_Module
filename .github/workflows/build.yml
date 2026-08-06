@@ -2,7 +2,7 @@ name: Build Module
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, v2.7-fixes ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]

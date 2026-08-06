@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.7-72 — fixes
+
+- **The Logs tab no longer rebuilds itself every poll.** The change-detection
+  guard had a reversed assignment (`logsList.length = prev_logs_count`) that
+  truncated the list and defeated the check, so the Logs view fully re-rendered
+  every 5 s (visible flicker / scroll jump). It now caches the rendered count and
+  only rebuilds when the log actually changes.
+- **Dropped the inert `system.prop`.** It set `tcp_congestion_control` and
+  `default_qdisc` as Android *properties*, which nothing consumes — the real
+  sysctls are driven by the scripts. The props only contradicted the live values
+  during debugging (they read `bbr`/`fq` while the sysctls were `cubic`/`fq_codel`).
+- **Route/congctl and initcwnd batches run directly instead of via `su -c`.** The
+  daemon is already root, so re-spawning `su` per batch was redundant and added an
+  extra root-exec event that OxygenOS's tamper heuristic watches.
+- **Benchmark results are written base64-encoded**, matching the delete/rewrite
+  path, so no field value can break the shell redirect.
+- CI now builds on pushes to this branch; webroot cache-buster bumped to v72.
+
 ## v2.7-71 — fixes
 
 - **The drift guard no longer fights WebUI tests.** Auto-Optimize and the CC
